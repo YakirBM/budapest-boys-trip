@@ -1,17 +1,27 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
 /**
  * Emits public/sw-manifest.js: precache list + build id (docs/07).
- * Run after `next build` (postbuild) so the .next build id exists.
+ * Run before `next build` so Next/Vercel collect the generated public asset.
  */
 
 const root = process.cwd();
-const buildIdPath = resolve(root, ".next/BUILD_ID");
-const buildId = existsSync(buildIdPath) ? readFileSync(buildIdPath, "utf8").trim() : `dev-${Date.now()}`;
+let sourceRevision = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
+if (!sourceRevision) {
+  try {
+    sourceRevision = execFileSync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    sourceRevision = `local-${Date.now()}`;
+  }
+}
+const buildId = sourceRevision.slice(0, 16);
 
 const shellUrls = [
-  "/today",
   "/offline",
   "/manifest.webmanifest",
   "/icons/icon-192.png",

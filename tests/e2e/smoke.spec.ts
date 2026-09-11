@@ -37,6 +37,24 @@ test.describe("PWA artifacts", () => {
     expect(body).toContain("outbox-flush");
   });
 
+  test("service worker does not break protected-route redirects", async ({ page }) => {
+    await page.goto("/login");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+
+    await page.goto("/today");
+    await expect(page).toHaveURL(/\/login/);
+
+    const cachedToday = await page.evaluate(async () => {
+      for (const cacheName of await caches.keys()) {
+        const cache = await caches.open(cacheName);
+        if (await cache.match("/today")) return true;
+      }
+      return false;
+    });
+    expect(cachedToday).toBe(false);
+  });
+
   test("offline fallback page renders", async ({ page }) => {
     await page.goto("/offline");
     await expect(page.locator("main")).toBeVisible();

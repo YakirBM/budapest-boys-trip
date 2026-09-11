@@ -5,8 +5,6 @@
  * Never caches mutations, auth, or realtime endpoints.
  */
 
-const VERSION = self.BUILD_VERSION || "dev";
-
 try {
   importScripts("./sw-manifest.js");
 } catch {
@@ -15,13 +13,16 @@ try {
 
 /* global BUILD_VERSION:false */
 
+// The generated manifest must load before the cache names are derived. This
+// guarantees that activating a new deployment deletes caches from older builds.
+const VERSION = self.BUILD_VERSION || "dev";
+
 const SHELL_CACHE = `shell-${VERSION}`;
 const RUNTIME_CACHE = `runtime-${VERSION}`;
 const DATA_CACHE = `data-${VERSION}`;
 const MEDIA_CACHE = `media-${VERSION}`;
 
 const PRECACHE_URLS = (self.PRECACHE_URLS || [
-  "/today",
   "/offline",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
@@ -94,23 +95,14 @@ function isSignedMedia(url) {
   );
 }
 
-async function staleWhileRevalidate(request, cacheName, fallbackUrl) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request, { ignoreVary: true });
-  const network = fetch(request)
-    .then((response) => {
-      if (response.ok) cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => null);
-  if (cached) {
-    void network;
-    return cached;
-  }
-  const fresh = await network;
-  if (fresh) return fresh;
-  if (fallbackUrl) {
-    const fallback = await cache.match(fallbackUrl, { ignoreVary: true });
+async function networkFirstNavigation(request) {
+  try {
+    // Authenticated HTML/RSC responses are user-specific and may redirect.
+    // Never persist them in Cache Storage; offline data lives in IndexedDB.
+    return await fetch(request);
+  } catch {
+    const cache = await caches.open(SHELL_CACHE);
+    const fallback = await cache.match("/offline", { ignoreVary: true });
     if (fallback) return fallback;
   }
   return new Response("offline", { status: 503, statusText: "offline" });
@@ -174,7 +166,7 @@ self.addEventListener("fetch", (event) => {
   if (request.mode !== "navigate" && request.redirect !== "follow") return;
 
   if (request.mode === "navigate") {
-    event.respondWith(staleWhileRevalidate(request, SHELL_CACHE, "/offline"));
+    event.respondWith(networkFirstNavigation(request));
     return;
   }
 

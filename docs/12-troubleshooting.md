@@ -179,6 +179,12 @@ curl -s https://<vercel-domain>/sw.js | head -5          # deployed SW revision
 - Manual escape hatch for a member: pull-to-refresh twice, or DevTools → Application → Clear storage.
   A plain reload does **not** bypass the SW.
 
+**Resolved production redirect failure (2026-09-11)**: `/today` was previously precached while
+unauthenticated, so Cache Storage saved the followed `/login` response under the `/today` key.
+Returning that redirected response for a navigation caused Chromium `net::ERR_FAILED`. Protected
+HTML is now network-first and is never persisted; the generated build id is loaded before cache
+names are derived, so activating a deployment removes earlier `shell-dev` caches.
+
 ## 6. Realtime not updating
 
 **Symptom**: poll votes / expenses / media don't appear live for other members.

@@ -72,7 +72,7 @@ All planning docs live in `docs/` and are written in **English**. The app UI is 
 
 ## Local tooling (app added 2026-09-11)
 
-- Commands: `pnpm dev` · `pnpm lint` · `pnpm typecheck` · `pnpm test` (vitest unit) · `pnpm test:e2e` (Playwright) · `pnpm build` (runs postbuild → scripts/build-sw-manifest.mjs) · `pnpm db:push` · `node scripts/verify-seed.mjs` (seed counts + masked-ref scan) · `node scripts/visual-audit.mjs` (RTL/theme screenshots, needs pnpm start).
+- Commands: `pnpm dev` · `pnpm lint` · `pnpm typecheck` · `pnpm test` (vitest unit) · `pnpm test:e2e` (Playwright) · `pnpm build` (runs prebuild → scripts/build-sw-manifest.mjs before Next collects public assets) · `pnpm db:push` · `node scripts/verify-seed.mjs` (seed counts + masked-ref scan) · `node scripts/visual-audit.mjs` (RTL/theme screenshots, needs pnpm start).
 - i18n: `messages/he.json` is the base; each feature screen owns `messages/he/<feature>.json` (top-level key = section, overrides base) — merged in `lib/i18n.ts`. No hardcoded Hebrew in components.
 - Migrations are the schema source of truth: `supabase/migrations/0001…0016` applied via `supabase db push`; bulk seed mirrored in `0015_seed_bulk.sql` + `supabase/seed.sql` (both idempotent). `supabase/rls-tests.sql` needs direct SQL access (see BUILD_STATUS B3).
 - The app lives in `app/ components/ lib/ messages/ public/ tests/`; `media/` holds raw private documents (passports, e-ticket) — gitignored, never ship or upload its contents.

@@ -65,13 +65,17 @@ Justification:
 - [ ] Register the SW in production only; keep dev on plain network to avoid stale-cache confusion.
 - [ ] Ship `app/offline/page.tsx` as the navigation fallback.
 
-Precache: `/today`, `/offline`, manifest, icons, bottom-nav SVGs.
+Precache only public shell assets: `/offline`, manifest, icons, bottom-nav SVGs. Authenticated
+HTML such as `/today` is never stored in Cache Storage because it is session-specific and can
+contain a redirected login response. Daily data is mirrored in IndexedDB after authentication.
+`prebuild` generates `public/sw-manifest.js` before Next collects public assets; Vercel's Git
+commit SHA is the cache version (local builds use a unique timestamp).
 
 ### Runtime caching rules
 
 | Resource | Strategy | Notes |
 |---|---|---|
-| Page navigations (RSC/HTML) | stale-while-revalidate | instant cached shell, refresh in background; fall back to `/offline` when uncached |
+| Page navigations (RSC/HTML) | network-first, no Cache Storage persistence | prevents redirected/session-specific HTML from leaking across sessions; fall back to `/offline` when offline |
 | `/_next/static/*` | cache-first | hashed, immutable |
 | Supabase PostgREST GET | network-first, cache fallback | key includes user id; never cache mutations |
 | Storage signed URLs (media/docs) | cache-first + revalidate | on 400/403 (expired URL) evict entry, request a fresh signed URL |

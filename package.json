@@ -9,9 +9,9 @@
   },
   "packageManager": "pnpm@10.11.1",
   "scripts": {
+    "prebuild": "node scripts/build-sw-manifest.mjs",
     "dev": "next dev",
     "build": "next build",
-    "postbuild": "node scripts/build-sw-manifest.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
