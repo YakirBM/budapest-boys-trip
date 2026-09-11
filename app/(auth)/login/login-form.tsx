@@ -19,6 +19,9 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [stage, setStage] = useState<Stage>(params.get("error") ? "error" : "idle");
+  // Link-exchange failures (?error=auth) need different guidance than a wrong code:
+  // the link is single-use and bound to the requesting browser.
+  const [errorKind, setErrorKind] = useState<"link" | "action">(params.get("error") ? "link" : "action");
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -44,8 +47,9 @@ export default function LoginForm() {
     })();
   }, []);
 
-  async function sendLogin(event: React.FormEvent) {
-    event.preventDefault();
+  async function sendLogin(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (email.trim() === "") return;
     setStage("sending");
     try {
       const supabase = getSupabaseBrowserClient();
@@ -56,8 +60,10 @@ export default function LoginForm() {
           shouldCreateUser: true,
         },
       });
+      if (error) setErrorKind("action");
       setStage(error ? "error" : "sent");
     } catch {
+      setErrorKind("action");
       setStage("error");
     }
   }
@@ -73,11 +79,13 @@ export default function LoginForm() {
         type: "email",
       });
       if (error) {
+        setErrorKind("action");
         setStage("error");
         return;
       }
       window.location.assign("/today");
     } catch {
+      setErrorKind("action");
       setStage("error");
     }
   }
@@ -104,7 +112,7 @@ export default function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="name@gmail.com"
+            placeholder={t("login.emailPlaceholder")}
             className="min-h-12 w-full rounded-xl border border-border bg-surface px-4 text-start text-base text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-brand"
           />
           <button
@@ -134,6 +142,7 @@ export default function LoginForm() {
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
+                placeholder={t("login.codePlaceholder")}
                 className="min-h-12 w-full rounded-xl border border-border bg-surface px-4 text-center text-lg tracking-widest text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-brand"
               />
               <button
@@ -141,7 +150,15 @@ export default function LoginForm() {
                 disabled={busy}
                 className="min-h-12 w-full rounded-xl bg-brand px-4 text-base font-semibold text-brand-contrast disabled:opacity-60"
               >
-                {t("login.verify")}
+                {busy ? t("common.loading") : t("login.verify")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void sendLogin()}
+                className="min-h-12 w-full rounded-xl border border-border bg-surface px-4 text-base font-semibold text-text-secondary disabled:opacity-60"
+              >
+                {t("login.resend")}
               </button>
             </form>
           </section>
@@ -149,12 +166,45 @@ export default function LoginForm() {
 
         {stage === "error" && (
           <p className="mt-4 rounded-xl bg-danger/10 px-4 py-3 text-start text-sm text-danger" role="alert">
-            {t("login.error")}
+            {t(errorKind === "link" ? "login.errorLink" : "login.error")}
           </p>
         )}
 
         <p className="mt-6 text-start text-xs text-text-muted">{t("login.noPasswordHint")}</p>
       </div>
+
+      <section
+        aria-label={t("login.howTitle")}
+        className="mt-3 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-sm"
+      >
+        <h2 className="text-start text-lg font-bold text-text-primary">{t("login.howTitle")}</h2>
+        <ol className="mt-3 flex flex-col gap-3">
+          {(
+            [
+              { n: "1", title: t("login.step1Title"), body: t("login.step1Body") },
+              { n: "2", title: t("login.step2Title"), body: t("login.step2Body") },
+              { n: "3", title: t("login.step3Title"), body: t("login.step3Body") },
+            ] as const
+          ).map((step) => (
+            <li key={step.n} className="flex items-start gap-3">
+              <span
+                aria-hidden
+                className="tnum grid h-8 w-8 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand-strong"
+              >
+                {step.n}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-start text-sm font-bold text-text-primary">{step.title}</span>
+                <span className="block text-start text-sm leading-6 text-text-secondary">{step.body}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 rounded-xl bg-warning/10 px-3 py-2 text-start text-xs leading-5 text-text-secondary">
+          <span className="font-bold text-warning">{t("login.sameBrowserTitle")}: </span>
+          {t("login.sameBrowserBody")}
+        </p>
+      </section>
     </main>
   );
 }

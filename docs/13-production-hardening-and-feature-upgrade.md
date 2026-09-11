@@ -4,7 +4,7 @@ title: Production Hardening and Feature Upgrade Execution Plan
 status: approved-in-progress
 owner: Yakir
 approved_at: 2026-09-11
-last_updated: 2026-09-11
+last_updated: 2026-09-11 (Checkpoint 4 — media sort/filter, map cluster/bounds/tile-error, money labels/sticky-save/error-state; E2E 12/12; UAT still needs an authenticated session)
 baseline_commit: a7a5032d1727e1793817d462b3bcc873b141312c
 depends_on:
   - 02-architecture
@@ -276,7 +276,11 @@ Primary files likely involved:
 
 Measurement-first tasks:
 
-- [ ] Instrument or inspect server timings for middleware auth, RSC payload, and Supabase queries.
+- [x] Instrument or inspect server timings for middleware auth, RSC payload, and Supabase queries.
+  (Checkpoint 4, unauthenticated edge timings from IL: `/sw-manifest.js` 200 in
+  ~0.21 s TTFB; `/login` 200 in ~0.24–0.29 s; `/` 307 in ~1.08 s cold / ~0.23 s
+  warm; `/today`, `/money` 307 middleware redirects in ~0.22–0.28 s TTFB warm.
+  Single-sample curl, not a device trace.)
 - [ ] Count requests during Today → Route → Map → Money → More and back.
 - [ ] Identify duplicate session/member/trip/data fetches.
 - [ ] Compare current Vercel execution placement with Supabase `ap-southeast-2` latency.
@@ -335,13 +339,19 @@ Tasks:
   horizontal segmented scroller.
 - [x] Keep currency codes and numeric values LTR/tabular while labels and layout remain RTL.
 - [x] Prevent amount, currency, payer, member, and settlement rows from overlapping.
-- [ ] Make long names truncate with an accessible full label.
+- [x] Make long names truncate with an accessible full label (Checkpoint 4: `title` on
+  expense titles, balance names, settlement names; settlement mark-paid aria now names
+  payer/payee via `money.markTransferAria` `{from}/{to}` params).
 - [ ] Keep primary totals above the fold without crowding.
 - [ ] Keep expense entry completable in no more than 15 seconds on a phone.
 - [x] Ensure sheets respect dynamic viewport height, keyboard, safe areas, and internal scroll.
-- [ ] Keep submit actions reachable while the soft keyboard is open.
-- [ ] Verify empty, loading, error, offline, queued, and settled states.
-- [ ] Apply the approved warm field-journal styling without harming contrast.
+- [x] Keep submit actions reachable while the soft keyboard is open (Checkpoint 4: save
+  button is now a sticky footer inside the expense sheet scrollport).
+- [x] Verify empty, loading, error, offline, queued, and settled states (Checkpoint 4: error
+  banner with retry added for failed expense/balance refetches; empty/offline-stale/
+  queued-pending/settled chips already existed; first paint is SSR-seeded so no separate
+  loading skeleton; full matrix still needs the authenticated device run).
+- [x] Apply the approved warm field-journal styling without harming contrast.
 
 Tests:
 
@@ -385,7 +395,10 @@ Functional tasks:
 - [x] Render geographic Budapest tiles with pan, pinch zoom, zoom controls, and correct orientation.
 - [x] Fit the initial camera to valid place/anchor markers; use a Budapest default when empty.
 - [x] Render distinct place day markers and transit anchor markers.
-- [ ] Cluster or declutter overlapping markers at low zoom.
+- [x] Cluster or declutter overlapping markers at low zoom (Checkpoint 4: deterministic grid
+  clustering below zoom 11 in `InteractiveMap`, numbered accessible buttons that zoom in on
+  tap; pure `clusterMarkers`/`clusterCellForZoom` helpers unit-tested; auto-fit no longer
+  fights the user's zoom).
 - [ ] Tap marker → accessible place card/sheet with name, category, day, verification state, cost,
   address/district, and navigation action.
 - [x] Add layer controls for places, transit anchors, and current location.
@@ -396,13 +409,19 @@ Functional tasks:
   assumption unless a verified routing response is available.
 - [x] Keep existing Google Maps navigation deep links actionable.
 - [x] Preserve places without coordinates in a list.
-- [x] Render a clear offline state without crashing; explicit tile-error messaging still pending.
+- [x] Render a clear offline state without crashing, plus a visible `role=alert` tile-error
+  banner when the `osm` raster source reports MapLibre `error` events while online.
 - [x] Update CSP for the exact selected tile host and nothing broader.
 
 Data accuracy:
 
-- [ ] Validate all seeded coordinates fall within plausible Budapest bounds.
-- [ ] Flag rather than silently render invalid coordinates.
+- [x] Validate all seeded coordinates fall within plausible Budapest bounds (Checkpoint 4:
+  `isWithinBudapest` generous metro box lat 47.34–47.64 / lng 18.84–19.36, unit-tested;
+  seed audit: only 2 places + 1 anchor carry coordinates — Airport 47.4369/19.2616 and Deák
+  47.4979/19.0547, all inside the box; remaining seeds are NULL by design with "verify + fill
+  lat/lng" notes and render in the no-location list).
+- [x] Flag rather than silently render invalid coordinates (Checkpoint 4: out-of-bounds places
+  are excluded from map markers and listed in a warning section with name + day).
 - [ ] Every distance/time value identifies its calculation/source and timestamp where dynamic.
 - [ ] Do not label traffic, transit, or travel estimates as live.
 
@@ -419,7 +438,7 @@ is narrow, and non-map bundles do not include the map library.
 
 ### Phase 5 — Media library, organization, and compression hardening
 
-Status: **CORE IMPLEMENTED; UAT AND ADVANCED QUEUE FEATURES PENDING**
+Status: **CORE + SORT/FILTER/RESET IMPLEMENTED; UAT AND ADVANCED QUEUE FEATURES PENDING**
 
 Proposed additive schema:
 
@@ -478,13 +497,16 @@ Library UX tasks:
 - [x] Add album creation and album filter; albums act as virtual folders.
 - [x] Add client search over title, caption, tags, tagged people, place, and album (dataset capped at
   240 rows; debounce is unnecessary at this scale).
-- [ ] Add filters: day, album, uploader/person, place, tag, visibility, and favourites/likes where
-  supported.
-- [ ] Add sort: newest, oldest, day, and title.
+- [x] Add filters: day, album, uploader/person, place, tag, visibility, and favourites/likes where
+  supported (Checkpoint 4: tag select from wall tags, visibility all/group/private, liked-by-me
+  toggle added alongside existing day/album/place/mine/search).
+- [x] Add sort: newest, oldest, day, and title (Checkpoint 4: pure `sortMediaItems` in
+  `lib/utils/media.ts`, unit-tested; select in the wall toolbar).
+- [x] Add clear empty results and reset-filter actions (Checkpoint 4: `hasActiveMediaFilters`
+  drives a reset chip + empty-filtered state with reset button; `media.emptyFiltered*` keys).
 - [x] Keep a two-column narrow-mobile masonry/grid with predictable aspect ratio placeholders.
 - [x] Use thumbnail signed URLs in the grid and full derivative only in detail view.
 - [x] Keep likes/comments and private visibility semantics.
-- [ ] Add clear empty results and reset-filter actions.
 - [ ] Do not display private item metadata to non-owners when the media row itself is private.
 
 Exit gate: compression never silently leaks originals, organization/search/editing work, signed
@@ -520,20 +542,24 @@ identity mechanism is present.
 
 ### Phase 7 — Full verification and release preparation
 
-Status: **NOT STARTED**
+Status: **IN PROGRESS — AUTOMATED GREEN, AUTHENTICATED UAT PENDING**
 
 Automated checks:
 
 - [x] `pnpm lint`
 - [x] `pnpm typecheck`
-- [x] `pnpm test`
+- [x] `pnpm test` (Checkpoint 4: 9 files / 56 tests — 43 existing + 13 new media/geo)
 - [x] `pnpm build`
-- [ ] relevant Playwright E2E tests
-- [x] `node scripts/verify-seed.mjs`
-- [ ] RLS test suite with direct SQL access
-- [x] Supabase security advisor
-- [x] Supabase performance advisor
-- [ ] secret scan/manual sensitive-value scan
+- [x] relevant Playwright E2E tests (Checkpoint 4: `smoke.spec.ts` 12/12 on mobile-chrome +
+  mobile-safari after installing the missing WebKit runtime; finance/media flows have no
+  unauthenticated E2E — authenticated coverage still pending)
+- [x] `node scripts/verify-seed.mjs` (Checkpoint 4: live production read — 11/11 counts OK,
+  `allowed_emails` = 5, no data mutations)
+- [ ] RLS test suite with direct SQL access (still blocked — B3, no DB password)
+- [x] Supabase security advisor (no DDL this session — Checkpoint 1/2 results stand)
+- [x] Supabase performance advisor (no DDL this session — Checkpoint 1/2 results stand)
+- [x] secret scan/manual sensitive-value scan (Checkpoint 4: diff scanned for service-role
+  keys/tokens/full booking refs — clean; no hardcoded Hebrew in edited TSX)
 
 Manual/visual checks:
 
@@ -782,9 +808,136 @@ Every checkpoint entry must include:
 |---|---|---|
 | 0. Baseline and plan | PARTIAL | Authenticated visual baseline pending |
 | 1. Allowlist | IMPLEMENTED | Manual five/stranger/Roei login UAT pending |
-| 2. Performance | IMPLEMENTED/PENDING METRICS | Post-deploy production timings pending |
-| 3. Money mobile | IMPLEMENTED/PENDING UAT | Authenticated viewport matrix pending |
-| 4. Real map | IMPLEMENTED/PENDING UAT | Device tiles/location/touch checks pending |
-| 5. Media library | CORE IMPLEMENTED | Upload/edit/private/device UAT pending |
+| 2. Performance | IMPLEMENTED/PARTIAL METRICS | Anon edge timings measured (Ckpt 4); authed timings + request counts pending |
+| 3. Money mobile | IMPLEMENTED/PENDING UAT | Labels/sticky-save/error-state added (Ckpt 4); authenticated viewport matrix pending |
+| 4. Real map | IMPLEMENTED/PENDING UAT | Cluster/bounds-flag/tile-banner added (Ckpt 4); device tiles/location/touch checks pending |
+| 5. Media library | CORE+SORT/FILTER IMPLEMENTED | RLS-SQL suite (B3) + persistent upload queue + device UAT pending |
 | 6. Profiles/design | IMPLEMENTED | Device visual matrix pending |
-| 7. Release verification | DEPLOYED `ab17f40` | Manual authenticated gates pending |
+| 7. Release verification | AUTOMATED GREEN, NO COMMIT | Manual authenticated gates pending; worktree holds uncommitted Ckpt 4 changes |
+
+### Checkpoint 4 — Media sort/filter, map hardening, money labels, full automated green
+
+- Timestamp: 2026-09-11 ~12:35 (Asia/Jerusalem)
+- Agent: continuation session (opencode), resuming from Checkpoint 3.
+- Branch/HEAD: `main` / `e46abad` (clean at start, in sync with `origin/main`); no commit/push
+  this turn (not requested). Worktree now holds the uncommitted changes listed below.
+- Production state verified (read-only): `/sw-manifest.js` serves
+  `BUILD_VERSION=e46abad6cb1ca49e` — the second deploy (design line) is live. Anon edge
+  timings (single-sample curl from IL): `/sw-manifest.js` 200 ~0.21 s TTFB; `/login` 200
+  ~0.24–0.29 s; `/` 307 ~1.08 s cold / ~0.23 s warm; `/today` + `/money` 307 middleware
+  redirects ~0.22–0.28 s warm. All 6 security headers present incl. narrow tile-host CSP.
+  No region change (no before/after evidence yet — per plan rule).
+- Phase 5 (media) slice:
+  - New `lib/utils/media.ts`: `sortMediaItems` (newest/oldest/day/title), `collectMediaTags`,
+    `hasActiveMediaFilters` + defaults; new `tests/unit/media.test.ts` (8 tests).
+  - `MediaView`: sort select, visibility filter (all/group/private), tag select from wall tags,
+    liked-by-me toggle, reset-filters chip + button, distinct empty-filtered state reusing the
+    pre-existing `media.emptyFiltered*` keys. New i18n keys in `messages/he/media.json`.
+  - Still pending: RLS SQL suite (blocked B3), tab-close-surviving upload queue (large —
+    needs IndexedDB blob outbox + SW replay; online-only two-worker queue unchanged), byte-level
+    per-file progress (supabase-js has no XHR progress — indeterminate per-file state stays).
+- Phase 4 (map) slice:
+  - `lib/utils/geo.ts`: `BUDAPEST_BOUNDS` + `isWithinBudapest`, `CLUSTER_MAX_ZOOM = 11`,
+    `clusterCellForZoom`, `clusterMarkers`; `tests/unit/geo.test.ts` +5 tests.
+  - `InteractiveMap`: low-zoom grid clustering with numbered accessible buttons (tap zooms in),
+    MapLibre `error`-event tile-failure callback, auto-fit no longer fights user zoom; new
+    `.real-map-marker--cluster` style in `globals.css`.
+  - `MapView`: out-of-bounds places excluded from markers and listed in a warning section;
+    visible `role=alert` tile-error banner (online only). New keys in `messages/he/map.json`.
+  - Seed audit: only Airport/Deák (+1 anchor) carry coordinates, all inside the box; the rest are
+    NULL by design with "verify + fill lat/lng" notes.
+- Phase 3 (money) slice:
+  - `MoneyView`: `title` full-name labels on truncated expense/balance/settlement names;
+    settlement mark-paid aria now names payer/payee (`markTransferAria` `{from}/{to}`);
+    error banner with retry for failed expense/balance refetches (`money.loadError`).
+  - `ExpenseForm`: save button is now a sticky footer inside the sheet scrollport (keyboard-open
+    reachability). Split-row member names keep input aria-labels (accessible by association).
+- Verification (serial, all PASS): `pnpm lint` (0 problems), `pnpm typecheck` (0 errors),
+  `pnpm test` (9 files / 56 tests), `pnpm build` (shared 102 kB; `/map` 246 kB; `/media`
+  245 kB; `/money` 249 kB; `/today` 257 kB; middleware 94.5 kB).
+- `pnpm test:e2e`: 12/12 PASS (mobile-chrome + mobile-safari) after `pnpm exec playwright
+  install webkit` (first run: 4 safari failures — missing browser runtime, env-only issue).
+- `node scripts/verify-seed.mjs`: PASS against live production (11/11 counts, allowlist = 5).
+  No migrations, no DDL, no data mutations, no deploys this turn.
+- Secret scan: worktree diff scanned for service-role keys/tokens/full booking refs — clean;
+  Hebrew-character scan over edited TSX/lib/app files — zero hits (all copy via messages/).
+- Changed files: `app/globals.css`, `components/feature/map/InteractiveMap.tsx`,
+  `components/feature/map/MapView.tsx`, `components/feature/media/MediaView.tsx`,
+  `components/feature/money/ExpenseForm.tsx`, `components/feature/money/MoneyView.tsx`,
+  `lib/utils/geo.ts`, `lib/utils/media.ts` (new), `messages/he/{map,media,money}.json`,
+  `public/sw-manifest.js` (build artifact regenerated to `e46abad…` — committed copy still says
+  `ab17f40`; harmless: Vercel rebuilds it from `VERCEL_GIT_COMMIT_SHA` on deploy),
+  `tests/unit/geo.test.ts`, `tests/unit/media.test.ts` (new), this document.
+- Unresolved risks/blockers:
+  - Phase 7 authenticated UAT still needs a user session (magic link) — checklist unchanged.
+  - Cluster/tile-error/out-of-bounds UI and media sort/filter are code-verified only (unit +
+    build + unauthenticated E2E); device visual confirmation pending.
+  - Tile-error banner relies on MapLibre `error` events; total tile-outage rendering still best
+    confirmed on a throttled device.
+- Exact next action: (1) if the user requests release → commit with message
+  `feat(media,map,money): wall sort/filter/reset, map clustering/bounds/tile-error, money labels/sticky-save/error-state`,
+  push `main`, wait for Vercel, verify new `BUILD_VERSION` + smoke test; (2) otherwise run the
+  guided authenticated UAT (Phase 7 checklist) with the user.
+
+### Checkpoint 5 — Aharon login failure triage + admin test link (no code change)
+
+- Timestamp: 2026-09-11 (Asia/Jerusalem, same day as Checkpoint 4)
+- Report: Aharon (allowlisted active member) received the OTP email, clicked the link, and saw
+  a login error.
+- Diagnosis (read-only Admin API + REST probes, no mutations):
+  - `auth.users`: Aharon exists, email confirmed `2026-09-11T12:02:30Z`, but `last_sign_in: NEVER`.
+  - `trip_members`: Aharon row present (`active`/`member`); `profiles`: full name present.
+    Account provisioning (trigger `handle_new_user`) is intact — this is purely a
+    link-exchange failure, not an account/allowlist/trigger bug.
+  - Likely cause: single-use link consumed without a session (opened in a different
+    browser than the requesting one → PKCE verifier missing, or mail-app prefetch/scan, or
+    double-click). First-line fix needs no code: type the 6-digit code manually on the same
+    device/browser instead of tapping the link.
+- Live action (explicit user request for a temporary login test): generated one admin
+  `magiclink` link for `aharonml123@gmail.com` via `/auth/v1/admin/generate_link`
+  (redirect to production origin). No email was sent; no DB/app code changed; the link itself
+  (a credential) was handed to the owner in chat and is NOT recorded here. Owner tests in an
+  incognito window as Aharon, then closes it — full revert with zero code delta.
+  (Rationale recorded: the requested "redirect Aharon's OTP to Yakir's inbox" code hack would
+  have logged Yakir in as Yakir — OTP is bound to the entered address — so it could not test
+  Aharon's account. Admin link tests the real account instead.)
+- Side finding: the app has **no sign-out control** (`signOut`/`logout` absent from the
+  codebase) — acceptable on personal devices, but it means test sessions can only be cleared
+  via incognito or site-data reset. Follow-up: add an explicit sign-out in `/more`.
+- Follow-up fix (same session, verified green): first-time signup emails contain only a
+  confirm button and no 6-digit code (per the existing `login.codeSent` copy), so a failed
+  first click left Aharon with no fallback. `LoginForm` now distinguishes link-exchange
+  failures (`?error=auth` → new `login.errorLink` guidance: request a fresh link, open it in
+  the same browser or type the code) from wrong-code errors. Changed: `app/(auth)/login/login-form.tsx`,
+  `messages/he.json`. Verification: lint/typecheck/56 tests/build all PASS.
+- Exact next action: owner runs the deterministic Aharon verification below → reports; then
+  decide commit/push of the Checkpoint 4+5 worktree.
+
+### Checkpoint 6 — Guided login screen + branded email templates (committed, not pushed)
+
+- Timestamp: 2026-09-11 (Asia/Jerusalem, same day)
+- User request: make the login screen copy clear/step-by-step and the emails designed and
+  simple; then commit (explicit commit authorization — push/deploy NOT requested).
+- Login screen (`app/(auth)/login/login-form.tsx`, `messages/he.json`):
+  - New "how it works" 3-step card (enter mail → open mail → in), always visible.
+  - Same-browser warning callout (single-use link, PKCE-bound, no in-app mail browser).
+  - Shorter `codeSent` copy; wired the previously dead `emailPlaceholder`/`codePlaceholder`
+    keys; removed the dead `changeEmail` key; new working **resend** button in the code stage
+    (`sendLogin` now re-callable without a form event + empty-mail guard).
+  - Prior `login.errorLink` distinction retained.
+- Email templates (new version-controlled source, applied via dashboard paste — no migration):
+  - `supabase/email-templates/confirm-signup.html` — first-login approve-button mail.
+  - `supabase/email-templates/magic-link.html` — returning-login mail with button + large
+    `{{ .Token }}` code.
+  - `supabase/email-templates/README.md` — 2-minute apply guide (slots, subjects, rules:
+    keep `{{ .ConfirmationURL }}`/`{{ .Token }}` byte-exact, neutral footer, same-browser warning).
+  - Supabase behavior unchanged: first mail carries no code (confirm button only); the code
+    path applies from the second mail on. No template was applied yet — owner paste pending.
+- Verification (serial, all PASS): `pnpm lint`, `pnpm typecheck`, `pnpm test` (9 files / 56),
+  `pnpm build` (`/login` 2.05 kB, First Load unchanged), `pnpm test:e2e` 12/12.
+- Commits (local only, explicit paths staged — no push, production still `e46abad`):
+  1. `feat(media,map,money): wall sort/filter/reset, map clustering/bounds/tile-error, money labels/sticky-save/error-state`
+  2. `feat(auth): guided login screen, link-failure guidance, branded email templates`
+- Exact next action: owner (a) pastes the two email templates per the README and sends a test
+  login mail, (b) runs the Aharon code-path verification, (c) says the word for push → then
+  push `main`, wait for Vercel, verify new `BUILD_VERSION` + production smoke test.
