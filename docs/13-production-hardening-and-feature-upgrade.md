@@ -941,3 +941,26 @@ Every checkpoint entry must include:
 - Exact next action: owner (a) pastes the two email templates per the README and sends a test
   login mail, (b) runs the Aharon code-path verification, (c) says the word for push → then
   push `main`, wait for Vercel, verify new `BUILD_VERSION` + production smoke test.
+
+### Checkpoint 7 — Release pushed and verified in production
+
+- Timestamp: 2026-09-11 (Asia/Jerusalem, same day)
+- Authorization: explicit user request ("commit, push, deploy"); email templates were confirmed
+  applied in the Supabase dashboard by the owner before the push.
+- Worktree was clean — no new commit needed for the release itself. Pushed `e46abad..391d784`
+  (`0723122` features + `391d784` auth) to `origin/main`.
+- Deploy evidence (live `https://medbadboys.vercel.app`):
+  - `/sw-manifest.js` serves `BUILD_VERSION=391d784ab9a7c0d3` (was `e46abad…`). Note: an early
+    poll loop showed empty bodies due to a local PowerShell regex/quoting fault, not a deploy
+    problem — direct fetch confirms 200 + new version.
+  - Route matrix: `/login` 200, `/today`+`/money`+`/map`+`/media` 307 (auth gate intact),
+    `/manifest.webmanifest`+`/sw.js`+`/offline` 200.
+  - Unauthenticated Playwright smoke **against production**: 12/12 PASS (both mobile projects).
+  - Visual proof: production `/login` screenshot shows the new guided copy (3-step card,
+    same-browser warning, "שליחת קישור כניסה") — the new bundle is served, not just built.
+  - `/login` HTML is still a Suspense-fallback shell (client renders the form; `useSearchParams`
+    blocks prerender) — expected, unchanged from before.
+- Database: no migrations, no DDL, no data changes in this release (code + i18n only).
+- Exact next action: owner runs the Aharon code-path verification on the live build + confirms
+  the branded test mail; remaining Phase 7 device UAT (tabs loop, money matrix, map, media,
+  airplane mode) still pending user execution.
