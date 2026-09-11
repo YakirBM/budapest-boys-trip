@@ -49,11 +49,9 @@ export async function updateSupabaseSession(request: NextRequest): Promise<NextR
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
-  if (user && pathname === "/login") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/today";
-    return NextResponse.redirect(url);
-  }
+  // NOTE: no redirect for authenticated users on /login — the login page's
+  // client effect handles that. Redirecting here creates a redirect loop
+  // whenever a transient getUser() failure alternates the two branches.
 
   return supabaseResponse;
 }
