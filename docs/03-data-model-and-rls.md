@@ -665,8 +665,8 @@ declare
   debtors jsonb; creditors jsonb; d_key text; c_key text; pay numeric;
 begin
   if not is_trip_member(p_trip) then raise exception 'not a trip member'; end if;
-  select coalesce(jsonb_object_agg(user_id, -net) filter (where net < 0), '{}'::jsonb),
-         coalesce(jsonb_object_agg(user_id,  net) filter (where net > 0), '{}'::jsonb)
+  select coalesce(jsonb_object_agg(user_id, -net_base_huf) filter (where net_base_huf < 0), '{}'::jsonb),
+         coalesce(jsonb_object_agg(user_id,  net_base_huf) filter (where net_base_huf > 0), '{}'::jsonb)
     into debtors, creditors
   from public.v_member_balances where trip_id = p_trip;
   while debtors <> '{}'::jsonb and creditors <> '{}'::jsonb loop
