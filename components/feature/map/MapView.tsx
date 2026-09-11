@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { MoneyAmount } from "@/components/ui/MoneyAmount";
-import { estimatedWalkingMinutes, formatDistance, haversineMeters, type GeoPoint } from "@/lib/utils/geo";
+import { estimatedWalkingMinutes, formatDistance, haversineMeters, isWithinBudapest, type GeoPoint } from "@/lib/utils/geo";
 
 export interface MapViewProps {
   initialData: MapData;
@@ -54,12 +54,26 @@ export function MapView({ initialData }: MapViewProps) {
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<GeoPoint | null>(null);
   const [locationState, setLocationState] = useState<"idle" | "loading" | "error">("idle");
+  const [tileError, setTileError] = useState(false);
 
   const placedMarkers = useMemo(
     () =>
       data.places
         .filter((place) => place.lat !== null && place.lng !== null)
-        .filter((place) => place.status !== "rejected"),
+        .filter((place) => place.status !== "rejected")
+        .filter((place) => isWithinBudapest(place.lat as number, place.lng as number)),
+    [data.places],
+  );
+  /** Coordinates outside the Budapest box are flagged, never rendered silently. */
+  const outOfBoundsPlaces = useMemo(
+    () =>
+      data.places.filter(
+        (place) =>
+          place.lat !== null &&
+          place.lng !== null &&
+          place.status !== "rejected" &&
+          !isWithinBudapest(place.lat, place.lng),
+      ),
     [data.places],
   );
   const noLocationPlaces = data.places.filter(
@@ -179,11 +193,38 @@ export function MapView({ initialData }: MapViewProps) {
             selectedPlaceId={selectedPlaceId}
             userLocation={userLocation}
             userLocationLabel={t("map.currentLocation")}
+            clusterAriaLabel={(count) => t("map.clusterLabel", { count })}
             onSelectPlace={setSelectedPlaceId}
+            onTileError={() => setTileError(true)}
           />
         )}
       </div>
+      {tileError && !isOffline && (
+        <p className="rounded-xl bg-danger/10 px-3 py-2 text-xs font-semibold text-danger" role="alert">
+          {t("map.tileError")}
+        </p>
+      )}
       <p className="text-xs text-text-muted">{t("map.realMapNote")}</p>
+
+      {outOfBoundsPlaces.length > 0 && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-3">
+          <p className="text-xs font-bold text-warning">{t("map.outOfBoundsTitle")}</p>
+          <p className="mt-0.5 text-xs text-text-secondary">{t("map.outOfBoundsHint")}</p>
+          <ul className="mt-2 flex flex-col gap-1">
+            {outOfBoundsPlaces.map((place) => (
+              <li key={place.id} className="flex items-center gap-2 text-sm text-text-primary">
+                <CategoryIcon category={place.category} size={24} />
+                <span className="min-w-0 flex-1 truncate" title={place.name}>{place.name}</span>
+                {place.scheduledDay !== null && (
+                  <span className="shrink-0 text-xs text-text-muted">
+                    {t("map.dayBadge", { day: place.scheduledDay })}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {selectedPlace && selectedDistance !== null && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2">

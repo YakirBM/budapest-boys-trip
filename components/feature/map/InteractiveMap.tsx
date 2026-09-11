@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AttributionControl,
   LngLatBounds,
@@ -11,7 +11,12 @@ import {
   type StyleSpecification,
 } from "maplibre-gl";
 import type { AnchorStation, MapPlace } from "@/lib/data/route";
-import type { GeoPoint } from "@/lib/utils/geo";
+import {
+  CLUSTER_MAX_ZOOM,
+  clusterCellForZoom,
+  clusterMarkers,
+  type GeoPoint,
+} from "@/lib/utils/geo";
 
 const BUDAPEST_CENTER: [number, number] = [19.0402, 47.4979];
 const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -42,6 +47,16 @@ function markerElement(label: string, kind: "place" | "anchor", day: number | nu
   return element;
 }
 
+function clusterElement(count: number, label: string): HTMLButtonElement {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.className = "real-map-marker real-map-marker--cluster";
+  element.setAttribute("aria-label", label);
+  element.title = label;
+  element.textContent = String(count);
+  return element;
+}
+
 export interface InteractiveMapProps {
   places: MapPlace[];
   anchors: AnchorStation[];
@@ -50,7 +65,10 @@ export interface InteractiveMapProps {
   selectedPlaceId: string | null;
   userLocation: GeoPoint | null;
   userLocationLabel: string;
+  clusterAriaLabel: (count: number) => string;
   onSelectPlace: (id: string) => void;
+  /** Fired once tile loading fails so the parent can show a visible banner. */
+  onTileError?: () => void;
 }
 
 export default function InteractiveMap({
@@ -61,12 +79,18 @@ export default function InteractiveMap({
   selectedPlaceId,
   userLocation,
   userLocationLabel,
+  clusterAriaLabel,
   onSelectPlace,
+  onTileError,
 }: InteractiveMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const locationMarkerRef = useRef<Marker | null>(null);
+  const tileErrorRef = useRef(onTileError);
+  tileErrorRef.current = onTileError;
+  const fittedRef = useRef<string | null>(null);
+  const [zoom, setZoom] = useState(12.4);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -80,6 +104,11 @@ export default function InteractiveMap({
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new AttributionControl({ compact: true }), "bottom-right");
+    map.on("zoomend", () => setZoom(map.getZoom()));
+    map.on("error", (event) => {
+      const detail = event as unknown as { sourceId?: string; tile?: unknown };
+      if (detail.sourceId === "osm" || detail.tile) tileErrorRef.current?.();
+    });
     map.on("load", () => {
       const brand =
         getComputedStyle(document.documentElement).getPropertyValue("--c-brand").trim() ||
@@ -110,13 +139,40 @@ export default function InteractiveMap({
     const bounds = new LngLatBounds();
 
     if (showPlaces) {
-      for (const place of places) {
-        if (place.lat === null || place.lng === null || place.status === "rejected") continue;
-        const element = markerElement(place.name, "place", place.scheduledDay);
-        element.dataset.selected = String(place.id === selectedPlaceId);
-        element.addEventListener("click", () => onSelectPlace(place.id));
-        markers.push(new Marker({ element, anchor: "center" }).setLngLat([place.lng, place.lat]).addTo(map));
-        bounds.extend([place.lng, place.lat]);
+      const visible = places.filter(
+        (place) => place.lat !== null && place.lng !== null && place.status !== "rejected",
+      );
+      if (zoom < CLUSTER_MAX_ZOOM && visible.length > 1) {
+        for (const cluster of clusterMarkers(
+          visible.map((place) => ({ id: place.id, lat: place.lat as number, lng: place.lng as number })),
+          clusterCellForZoom(zoom),
+        )) {
+          if (cluster.ids.length < 2) {
+            const place = visible.find((p) => p.id === cluster.ids[0]);
+            if (!place || place.lat === null || place.lng === null) continue;
+            const element = markerElement(place.name, "place", place.scheduledDay);
+            element.dataset.selected = String(place.id === selectedPlaceId);
+            element.addEventListener("click", () => onSelectPlace(place.id));
+            markers.push(new Marker({ element, anchor: "center" }).setLngLat([place.lng, place.lat]).addTo(map));
+          } else {
+            const label = clusterAriaLabel(cluster.ids.length);
+            const element = clusterElement(cluster.ids.length, label);
+            element.addEventListener("click", () => {
+              map.easeTo({ center: [cluster.lng, cluster.lat], zoom: Math.min(zoom + 2.5, 14) });
+            });
+            markers.push(new Marker({ element, anchor: "center" }).setLngLat([cluster.lng, cluster.lat]).addTo(map));
+          }
+          bounds.extend([cluster.lng, cluster.lat]);
+        }
+      } else {
+        for (const place of visible) {
+          if (place.lat === null || place.lng === null) continue;
+          const element = markerElement(place.name, "place", place.scheduledDay);
+          element.dataset.selected = String(place.id === selectedPlaceId);
+          element.addEventListener("click", () => onSelectPlace(place.id));
+          markers.push(new Marker({ element, anchor: "center" }).setLngLat([place.lng, place.lat]).addTo(map));
+          bounds.extend([place.lng, place.lat]);
+        }
       }
     }
     if (showAnchors) {
@@ -128,8 +184,18 @@ export default function InteractiveMap({
       }
     }
     markersRef.current = markers;
-    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 });
-  }, [anchors, onSelectPlace, places, selectedPlaceId, showAnchors, showPlaces]);
+    // Auto-fit only when the underlying dataset changes — never fight the
+    // user's own zoom (which also drives low-zoom clustering).
+    const fitSignature = JSON.stringify([
+      showPlaces ? places.map((p) => p.id) : [],
+      showAnchors ? anchors.map((a) => a.id) : [],
+      selectedPlaceId,
+    ]);
+    if (!bounds.isEmpty() && fittedRef.current !== fitSignature) {
+      fittedRef.current = fitSignature;
+      map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 });
+    }
+  }, [anchors, clusterAriaLabel, onSelectPlace, places, selectedPlaceId, showAnchors, showPlaces, zoom]);
 
   useEffect(() => {
     const map = mapRef.current;

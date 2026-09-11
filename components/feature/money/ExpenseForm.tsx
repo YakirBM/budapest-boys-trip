@@ -644,9 +644,12 @@ export function ExpenseForm({
           </p>
         )}
 
-        <Button block onClick={handleSave} loading={saving || undefined}>
-          {t("money.form.save")}
-        </Button>
+        {/* Sticky save — stays reachable while scrolling with the soft keyboard open. */}
+        <div className="sticky bottom-0 bg-surface-raised pb-1 pt-2">
+          <Button block onClick={handleSave} loading={saving || undefined}>
+            {t("money.form.save")}
+          </Button>
+        </div>
       </div>
     </BottomSheet>
   );

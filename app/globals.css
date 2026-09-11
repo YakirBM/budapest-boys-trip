@@ -352,6 +352,12 @@
   color: #fff;
 }
 
+.real-map-marker--cluster {
+  background: var(--c-brand);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
 .real-map-user-marker {
   display: block;
   width: 1.15rem;

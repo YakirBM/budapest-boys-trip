@@ -210,9 +210,22 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
 
   const transfers = balancesQ.data.settlements;
   const balances = balancesQ.data.balances.filter((b) => nameOf.has(b.user_id));
+  const loadFailed = expensesQ.isError || balancesQ.isError;
 
   return (
     <>
+      {loadFailed && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-danger/10 px-3 py-2" role="alert">
+          <span className="text-xs font-semibold text-danger">{t("money.loadError")}</span>
+          <button
+            type="button"
+            onClick={refresh}
+            className="inline-flex min-h-10 items-center rounded-lg px-2 text-xs font-bold text-danger"
+          >
+            {t("common.retry")}
+          </button>
+        </div>
+      )}
       {/* Stats */}
       <section aria-label={t("money.title")} className="mb-4 grid grid-cols-2 gap-2">
         <Card className="min-w-0 overflow-hidden p-3 sm:p-4 flex flex-col gap-1">
@@ -290,7 +303,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
               net > 0 ? t("money.owed") : net < 0 ? t("money.owes") : t("money.even");
             return (
               <li key={b.user_id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-lg bg-surface-raised px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_auto_auto]">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary" title={nameOf.get(b.user_id) ?? "—"}>
                   {nameOf.get(b.user_id) ?? "—"}
                 </span>
                 <span
@@ -322,21 +335,23 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
             {transfers.map((transfer) => {
               const key = `${transfer.from_user}->${transfer.to_user}->${transfer.amount_base_huf}`;
               const paid = paidTransfers.has(key);
+              const fromName = nameOf.get(transfer.from_user) ?? "—";
+              const toName = nameOf.get(transfer.to_user) ?? "—";
               return (
                 <li
                   key={key}
                   className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_auto_auto]"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
-                    <span className="font-semibold">{nameOf.get(transfer.from_user) ?? "—"}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-text-primary" title={`${fromName} → ${toName}`}>
+                    <span className="font-semibold">{fromName}</span>
                     <DirectionalIcon icon={ArrowRight} size={14} className="mx-1 inline text-text-muted" />
-                    <span className="font-semibold">{nameOf.get(transfer.to_user) ?? "—"}</span>
+                    <span className="font-semibold">{toName}</span>
                   </span>
                   <MoneyAmount amount={transfer.amount_base_huf} currency="HUF" size="sm" />
                   <button
                     type="button"
                     disabled={paid}
-                    aria-label={t("money.markTransferAria")}
+                    aria-label={t("money.markTransferAria", { from: fromName, to: toName })}
                     onClick={() => markTransferPaid(key)}
                     className={
                       paid
@@ -381,7 +396,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                       >
                         <ExpenseCategoryIcon category={e.category} size={36} />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-text-primary">{e.title}</p>
+                          <p className="truncate text-sm font-semibold text-text-primary" title={e.title}>{e.title}</p>
                           <p className="truncate text-xs text-text-muted">
                             {nameOf.get(e.paid_by) ?? "—"} · {timeFormatter(e.spent_at)} ·{" "}
                             {expenseCategoryLabel(e.category)}

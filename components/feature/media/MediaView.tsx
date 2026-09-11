@@ -29,6 +29,14 @@ import type {
 } from "@/lib/data/media";
 import type { TripMember } from "@/lib/data/trip";
 import { compressImage, isAllowedImageFile, sha256Hex, MAX_INPUT_BYTES } from "@/lib/utils/image";
+import {
+  collectMediaTags,
+  DEFAULT_MEDIA_SORT,
+  hasActiveMediaFilters,
+  sortMediaItems,
+  type MediaSortMode,
+  type MediaVisibilityFilter,
+} from "@/lib/utils/media";
 import { getSignedUrls, peekSignedUrl } from "./signedUrlCache";
 
 export interface MediaViewProps {
@@ -205,6 +213,10 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
   const [mineOnly, setMineOnly] = useState(false);
   const [albumFilter, setAlbumFilter] = useState("");
   const [placeFilter, setPlaceFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState<MediaVisibilityFilter>("all");
+  const [likedOnly, setLikedOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<MediaSortMode>(DEFAULT_MEDIA_SORT);
   const [search, setSearch] = useState("");
   const [uploads, setUploads] = useState<UploadTile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -241,9 +253,42 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
     return map;
   }, [mediaQ.data.reactions]);
 
+  const likedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of mediaQ.data.reactions) {
+      if (r.kind === "like" && r.member_id === userId) set.add(r.media_id);
+    }
+    return set;
+  }, [mediaQ.data.reactions, userId]);
+
+  const availableTags = useMemo(() => collectMediaTags(mediaQ.data.items), [mediaQ.data.items]);
+
+  const filtersActive = hasActiveMediaFilters({
+    day: dayFilter,
+    mineOnly,
+    albumId: albumFilter,
+    placeId: placeFilter,
+    tag: tagFilter,
+    visibility: visibilityFilter,
+    likedOnly,
+    search,
+  });
+
+  function resetFilters(): void {
+    setDayFilter(null);
+    setMineOnly(false);
+    setAlbumFilter("");
+    setPlaceFilter("");
+    setTagFilter("");
+    setVisibilityFilter("all");
+    setLikedOnly(false);
+    setSearch("");
+    setSortMode(DEFAULT_MEDIA_SORT);
+  }
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("he-IL");
-    return mediaQ.data.items.filter((item) => {
+    const matches = mediaQ.data.items.filter((item) => {
       const searchable = [
         item.title,
         item.caption,
@@ -261,10 +306,14 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         (!mineOnly || item.uploader_id === userId) &&
         (albumFilter === "" || item.album_id === albumFilter) &&
         (placeFilter === "" || item.linked_place_id === placeFilter) &&
+        (tagFilter === "" || item.tags.includes(tagFilter)) &&
+        (visibilityFilter === "all" || item.visibility === visibilityFilter) &&
+        (!likedOnly || likedIds.has(item.id)) &&
         (needle === "" || searchable.includes(needle))
       );
     });
-  }, [albumFilter, dayFilter, mediaQ.data.albums, mediaQ.data.items, mediaQ.data.places, mineOnly, nameOf, placeFilter, search, userId]);
+    return sortMediaItems(matches, sortMode);
+  }, [albumFilter, dayFilter, likedIds, likedOnly, mediaQ.data.albums, mediaQ.data.items, mediaQ.data.places, mineOnly, nameOf, placeFilter, search, sortMode, tagFilter, userId, visibilityFilter]);
 
   const viewer = viewerId !== null ? mediaQ.data.items.find((i) => i.id === viewerId) ?? null : null;
 
@@ -611,11 +660,79 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         >
           {t("media.filterMine")}
         </button>
+        <button
+          type="button"
+          aria-pressed={likedOnly}
+          onClick={() => setLikedOnly((v) => !v)}
+          className={
+            likedOnly
+              ? "min-h-10 rounded-full bg-brand px-3 text-xs font-bold text-brand-contrast"
+              : "min-h-10 rounded-full border border-border bg-surface px-3 text-xs font-bold text-text-secondary"
+          }
+        >
+          {t("media.likedOnly")}
+        </button>
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="min-h-10 rounded-full border border-danger/40 bg-surface px-3 text-xs font-bold text-danger"
+          >
+            {t("media.resetFilters")}
+          </button>
+        )}
+      </div>
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <label>
+          <span className="sr-only">{t("media.sortLabel")}</span>
+          <select
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as MediaSortMode)}
+            className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
+          >
+            <option value="newest">{t("media.sortNewest")}</option>
+            <option value="oldest">{t("media.sortOldest")}</option>
+            <option value="day">{t("media.sortDay")}</option>
+            <option value="title">{t("media.sortTitle")}</option>
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">{t("media.visibilityLabel")}</span>
+          <select
+            value={visibilityFilter}
+            onChange={(event) => setVisibilityFilter(event.target.value as MediaVisibilityFilter)}
+            className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
+          >
+            <option value="all">{t("media.visibilityAll")}</option>
+            <option value="group">{t("media.visibilityGroup")}</option>
+            <option value="private">{t("media.visibilityPrivate")}</option>
+          </select>
+        </label>
+        <label className="col-span-2">
+          <span className="sr-only">{t("media.tagLabel")}</span>
+          <select
+            value={tagFilter}
+            onChange={(event) => setTagFilter(event.target.value)}
+            className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
+          >
+            <option value="">{t("media.allTags")}</option>
+            {availableTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+          </select>
+        </label>
       </div>
 
       {/* Grid — masonry via CSS columns */}
       {filtered.length === 0 ? (
-        <EmptyState illustration="media" title={t("media.empty")} hint={t("media.emptyHint")} />
+        mediaQ.data.items.length === 0 ? (
+          <EmptyState illustration="media" title={t("media.empty")} hint={t("media.emptyHint")} />
+        ) : (
+          <div className="flex flex-col items-center gap-3">
+            <EmptyState illustration="media" title={t("media.emptyFiltered")} hint={t("media.emptyFilteredHint")} />
+            <Button variant="secondary" onClick={resetFilters}>
+              {t("media.resetFilters")}
+            </Button>
+          </div>
+        )
       ) : (
         <div className="columns-2 gap-2 min-[430px]:columns-3">
           {filtered.map((item) => (
