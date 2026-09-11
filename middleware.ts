@@ -12,6 +12,6 @@ export const config = {
      * - _next/static, _next/image (build assets)
      * - favicon / icons / sw files (static PWA assets)
      */
-    "/((?!_next/static|_next/image|favicon.ico|icons/|sw.js|sw-manifest.js|manifest.webmanifest).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons/|theme-init.js|sw.js|sw-manifest.js|manifest.webmanifest).*)",
   ],
 };
