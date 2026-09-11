@@ -1,0 +1,27 @@
+{
+  "map": {
+    "title": "מפה",
+    "schematicNote": "שרטוט סכמטי בלבד — לניווט השתמשו בכפתור נווט",
+    "legendIdea": "רעיון",
+    "legendApproved": "מאושר",
+    "legendScheduled": "משובץ",
+    "legendAnchor": "תחנת עוגן",
+    "layerPlaces": "מקומות",
+    "layerAnchors": "תחנות עוגן",
+    "dayBadge": "יום {day}",
+    "noLocationTitle": "רשימה בלי מיקום",
+    "noLocationHint": "למקומות האלה אין קואורדינטות — הם לא מופיעים בשרטוט",
+    "empty": "אין מקומות להצגה",
+    "sheetScheduled": "משובץ ליום {day}",
+    "sheetNotScheduled": "לא שובץ ליום",
+    "sheetScheduleCta": "שיבוץ במסלול",
+    "anchorTbd": "ייקבע לאחר הזמנת הדירה",
+    "outOfFrame": "מחוץ למסגרת השרטוט",
+    "statusIdea": "רעיון",
+    "statusUnderReview": "בבדיקה",
+    "statusApproved": "מאושר",
+    "statusScheduled": "משובץ",
+    "statusVisited": "ביקרנו",
+    "statusRejected": "נפסל"
+  }
+}

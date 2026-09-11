@@ -1,0 +1,302 @@
+/* ============================================================================
+   globals.css — Tailwind CSS v4, CSS-first config.
+   Design tokens per docs/05-ui-ux-design-system.md §3–§6. Source of truth.
+   Components consume semantic utilities (bg-surface, text-text-primary,
+   border-border, text-cat-food, …) — never raw palette names.
+
+   Implementation note: doc 05 sketches `@theme inline { .dark { … } }`. Tailwind
+   v4 does not support nested selectors inside @theme, so we use the canonical
+   indirection: `@theme inline` maps semantic tokens to raw `--c-*` vars, and
+   `:root` / `.dark` define those vars. Because utilities are generated with the
+   raw var inlined, they re-resolve per element under `.dark` on <html>.
+   ========================================================================== */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Font — Heebo via next/font (variable --font-heebo set on <html>). */
+  --font-sans: var(--font-heebo), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Semantic tokens (light + dark). Values per doc 05 §4 — verified AA pairs. */
+@theme inline {
+  /* Brand — confident teal-blue */
+  --color-brand: var(--c-brand);
+  --color-brand-strong: var(--c-brand-strong);
+  --color-brand-soft: var(--c-brand-soft);
+  --color-brand-contrast: var(--c-brand-contrast);
+
+  /* Surfaces & text */
+  --color-background: var(--c-background);
+  --color-surface: var(--c-surface);
+  --color-surface-raised: var(--c-surface-raised);
+  --color-border: var(--c-border);
+  --color-text-primary: var(--c-text-primary);
+  --color-text-secondary: var(--c-text-secondary);
+  --color-text-muted: var(--c-text-muted);
+
+  /* Feedback */
+  --color-success: var(--c-success);
+  --color-warning: var(--c-warning);
+  --color-danger: var(--c-danger);
+  --color-info: var(--c-info);
+
+  /* Categories */
+  --color-cat-food: var(--c-cat-food);
+  --color-cat-attraction: var(--c-cat-attraction);
+  --color-cat-walk: var(--c-cat-walk);
+  --color-cat-transit: var(--c-cat-transit);
+  --color-cat-rest: var(--c-cat-rest);
+  --color-cat-nightlife: var(--c-cat-nightlife);
+  --color-cat-flight: var(--c-cat-flight);
+  --color-cat-accommodation: var(--c-cat-accommodation);
+  --color-cat-other: var(--c-cat-other);
+
+  /* Itinerary statuses */
+  --color-st-planned: var(--c-st-planned);
+  --color-st-confirmed: var(--c-st-confirmed);
+  --color-st-in-progress: var(--c-st-in-progress);
+  --color-st-completed: var(--c-st-completed);
+  --color-st-skipped: var(--c-st-skipped);
+  --color-st-cancelled: var(--c-st-cancelled);
+
+  /* Expense statuses */
+  --color-exp-pending: var(--c-exp-pending);
+  --color-exp-settled: var(--c-exp-settled);
+  --color-exp-disputed: var(--c-exp-disputed);
+}
+
+:root {
+  --c-brand: #0e7490;
+  --c-brand-strong: #155e75;
+  --c-brand-soft: #cffafe;
+  --c-brand-contrast: #ffffff;
+
+  --c-background: #f8fafc;
+  --c-surface: #ffffff;
+  --c-surface-raised: #ffffff;
+  --c-border: #e2e8f0;
+  --c-text-primary: #0f172a;
+  --c-text-secondary: #334155;
+  --c-text-muted: #64748b;
+
+  --c-success: #15803d;
+  --c-warning: #b45309;
+  --c-danger: #b91c1c;
+  --c-info: #1d4ed8;
+
+  --c-cat-food: #ea580c;
+  --c-cat-attraction: #7c3aed;
+  --c-cat-walk: #16a34a;
+  --c-cat-transit: #2563eb;
+  --c-cat-rest: #0d9488;
+  --c-cat-nightlife: #db2777;
+  --c-cat-flight: #0284c7;
+  --c-cat-accommodation: #65a30d;
+  --c-cat-other: #64748b;
+
+  --c-st-planned: #64748b;
+  --c-st-confirmed: #15803d;
+  --c-st-in-progress: #b45309;
+  --c-st-completed: #0e7490;
+  --c-st-skipped: #94a3b8;
+  --c-st-cancelled: #b91c1c;
+
+  --c-exp-pending: #b45309;
+  --c-exp-settled: #15803d;
+  --c-exp-disputed: #b91c1c;
+}
+
+/* Dark overrides, activated by `.dark` on <html> (auto-dark / manual override). */
+.dark {
+  --c-brand: #22d3ee;
+  --c-brand-strong: #67e8f9;
+  --c-brand-soft: #164e63;
+  --c-brand-contrast: #082f3f;
+
+  --c-background: #0b1220;
+  --c-surface: #111c2e;
+  --c-surface-raised: #1a2740;
+  --c-border: #2a3a55;
+  --c-text-primary: #f1f5f9;
+  --c-text-secondary: #cbd5e1;
+  --c-text-muted: #94a3b8;
+
+  --c-success: #4ade80;
+  --c-warning: #fbbf24;
+  --c-danger: #f87171;
+  --c-info: #60a5fa;
+
+  --c-cat-food: #fb923c;
+  --c-cat-attraction: #a78bfa;
+  --c-cat-walk: #4ade80;
+  --c-cat-transit: #60a5fa;
+  --c-cat-rest: #2dd4bf;
+  --c-cat-nightlife: #f472b6;
+  --c-cat-flight: #38bdf8;
+  --c-cat-accommodation: #a3e635;
+  --c-cat-other: #94a3b8;
+
+  --c-st-planned: #94a3b8;
+  --c-st-confirmed: #4ade80;
+  --c-st-in-progress: #fbbf24;
+  --c-st-completed: #22d3ee;
+  --c-st-skipped: #64748b;
+  --c-st-cancelled: #f87171;
+
+  --c-exp-pending: #fbbf24;
+  --c-exp-settled: #4ade80;
+  --c-exp-disputed: #f87171;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--c-background);
+    color: var(--c-text-primary);
+    text-align: start; /* never justify Hebrew */
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* §10 — focus-visible ring: 2px brand + 2px offset, on all interactive elements */
+  :focus-visible {
+    outline: 2px solid var(--c-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* ============================================================================
+   Keyframes + motion (§9: 150–250ms, ease-out entrances; reduced-motion off)
+   ========================================================================== */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes brand-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c-brand) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--c-brand) 0%, transparent);
+  }
+}
+
+/* ============================================================================
+   Custom utilities
+   ========================================================================== */
+
+/* Tabular numerals for money, times, countdowns, coordinates (§5). */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Bidi isolation for mixed Hebrew + numbers/latin runs (§2). */
+@utility bidi-iso {
+  unicode-bidi: isolate;
+}
+
+/* Isolated LTR run: times, phone numbers, amounts, codes (§2). */
+@utility ltr-iso {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Safe-area helpers for viewport-fit=cover. */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Page content bottom padding: 64px nav + breathing room + safe area. */
+@utility pb-nav-safe {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Shimmer skeleton fill — static gray under prefers-reduced-motion (below). */
+@utility skeleton-shimmer {
+  background-color: var(--c-border);
+  background-image: linear-gradient(
+    90deg,
+    var(--c-border) 25%,
+    var(--c-surface-raised) 50%,
+    var(--c-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@utility anim-sheet-in {
+  animation: sheet-in 250ms ease-out both;
+}
+
+@utility anim-fade-in {
+  animation: fade-in 200ms ease-out both;
+}
+
+/* TimeBlock "now" state — brand border pulse. */
+@utility pulse-brand {
+  animation: brand-pulse 1.6s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Theme transitions (§3): color-only, ≤200ms. ThemeProvider adds
+   `.theme-transition` on <html> for ~250ms around a theme flip.
+   ========================================================================== */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    fill 150ms ease-out,
+    stroke 150ms ease-out !important;
+}
+
+/* ============================================================================
+   Reduced motion (§9): instant state changes, no shimmer / pulse / spin.
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

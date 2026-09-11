@@ -1,0 +1,65 @@
+{
+  "checklists": {
+    "title": "רשימות",
+    "subtitle": "הכנות לפני, במהלך ואחרי הטיול",
+    "tabs": {
+      "mine": "שלי",
+      "group": "קבוצתי",
+      "all": "הכול"
+    },
+    "progressAria": "התקדמות: {done} מתוך {total}",
+    "progressLabel": "{done}/{total}",
+    "listEmpty": "ריקה",
+    "emptyAll": "אין רשימות להצגה",
+    "emptyAllHint": "רשימות התבנית יופיעו כאן",
+    "emptyMine": "אין לך פריטים מוקצים",
+    "emptyMineHint": "פריטים שיוקצו אליך מכל הרשימות יופיעו כאן",
+    "backToLists": "כל הרשימות",
+    "sectionMine": "הפריטים שלי",
+    "sectionOthers": "של אחרים",
+    "sectionGroup": "פריטים כלליים",
+    "addItem": "הוספת פריט",
+    "addTitle": "פריט חדש",
+    "titleLabel": "שם הפריט",
+    "titlePlaceholder": "מה צריך לעשות?",
+    "priorityLabel": "עדיפות",
+    "assigneeLabel": "אחראי",
+    "assigneeNone": "כל אחד מהקבוצה",
+    "save": "הוספה",
+    "addedToast": "הפריט נוסף לרשימה",
+    "blockedBy": "חסום ע״י",
+    "blockedSheetTitle": "הפריט ייפתח רק לאחר השלמת:",
+    "blockedLockedHint": "אי אפשר לסמן כהושלם לפני הפריטים החוסמים",
+    "blockerOpen": "פתוח",
+    "blockerDone": "הושלם",
+    "toggleDoneAria": "סימון ״{title}״ כהושלם",
+    "toggleUndoneAria": "ביטול סימון ״{title}״",
+    "dueAt": "עד {date}",
+    "doneBy": "הושלם על ידי {name}",
+    "priority": {
+      "critical": "קריטי",
+      "important": "חשוב",
+      "normal": "רגיל"
+    },
+    "status": {
+      "not_started": "טרם התחיל",
+      "in_progress": "בתהליך",
+      "done": "הושלם",
+      "blocked": "חסום"
+    },
+    "readiness": {
+      "title": "מוכנות לפני הטיסה",
+      "overall": "{pct}% מוכן",
+      "urgentLabel": "דחוף:",
+      "urgentEmpty": "אין פריטים קריטיים פתוחים",
+      "memberAria": "מוכנות {name}: {pct}%"
+    },
+    "offlineQueuedToast": "השינוי נשמר במכשיר ויסונכרן בחיבור",
+    "errors": {
+      "generic": "השמירה נכשלה — נסו שוב",
+      "forbidden": "אין הרשאה לביצוע הפעולה",
+      "invalid": "כותרת הפריט היא שדה חובה",
+      "blocked": "הפריט חסום ע״י פריטים שטרם הושלמו — הסימון יתבטל"
+    }
+  }
+}

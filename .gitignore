@@ -1,0 +1,27 @@
+# Secrets & env
+.env*.local
+.env
+*.key
+*.pem
+
+# Private trip documents — never commit
+media/
+
+# Node / Next
+node_modules
+.next
+out
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Tests
+playwright-report
+test-results
+
+# Misc
+.DS_Store
+*.log
+.vercel
+
+# Screenshots (local evidence only)
+shots/

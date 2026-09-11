@@ -1,0 +1,88 @@
+{
+  "today": {
+    "title": "היום",
+    "nextUp": "הבא בתור",
+    "timeline": "ציר היום",
+    "feasibility": "האם המסלול אפשרי?",
+    "dayXof5": "יום {day}/5",
+    "countdownToTrip": "לפני היציאה",
+    "tripStarted": "הטיול התחיל!",
+    "tripDone": "הטיול הסתיים",
+    "leaveBy": "עזיבה",
+    "startsAt": "מתחיל",
+    "days": "ימים",
+    "hours": "שעות",
+    "minutes": "דקות",
+    "minutesShort": "דק'",
+    "oneMinuteLeft": "עוד דקה",
+    "minutesLeft": "עוד {count} דק'",
+    "hoursLeft": "עוד {count} שעות",
+    "daysLeft": "עוד {count} ימים",
+    "rainPlan": "תוכנית גשם",
+    "backToToday": "חזור להיום",
+    "buildDay": "בנה את היום במסלול",
+    "tzHungary": "שעון הונגריה",
+    "tzIsrael": "שעון ישראל",
+    "groupReady": "מוכנים",
+    "checkin": "צ'ק-אין",
+    "now": "עכשיו",
+    "feedTitle": "שינויים והחלטות",
+    "allTimesHungary": "כל השעות לפי שעון הונגריה",
+    "noItemsTitle": "אין עדיין תוכנית ליום הזה",
+    "noItemsHint": "משבצים מקומות במסלול — הפריטים יופיעו כאן בציר היום.",
+    "lateBanner": "עדכנתם איחור — ההערכה חושבה מחדש עם הזזת ההתחלה",
+    "lateClear": "נקה איחור",
+    "lateTitle": "כמה דקות מאחרים?",
+    "statusTitle": "עדכון סטטוס",
+    "statusRevertHint": "החזרה למתוכנן אפשרית למנהל הטיול בלבד",
+    "reservationSheetTitle": "הזמנה מקושרת",
+    "reservationNone": "אין הזמנה מקושרת לפריט הזה",
+    "backupOf": "גיבוי גשם: {title}",
+    "feasibility": {
+      "slackTight": "מרווח קצר: {minutes} דק' בלבד — לדחות הזמנה או לקצר ביקור",
+      "hardConflict": "קונפליקט: מגיעים אחרי תחילת ההזמנה — להזיז או לדלג"
+    },
+    "weather": {
+      "title": "מזג אוויר בודפשט",
+      "stale": "נתון ישן",
+      "empty": "אין נתוני מזג אוויר עדכניים",
+      "rainPct": "גשם {pct}%",
+      "wind": "רוח {wind} קמ\"ש",
+      "sunset": "שקיעה {time}"
+    },
+    "critical": {
+      "accommodationTitle": "משימה קריטית: סגירת דירה",
+      "accommodationBody": "הלינה עוד לא הוזמנה. דדליין: 20.09.2026 — נותרו {days} ימים.",
+      "accommodationBooked": "הלינה הוזמנה"
+    },
+    "emergency": {
+      "title": "עזרה בחירום",
+      "call112": "חירום 112 (אירופה)",
+      "accommodationAddress": "כתובת הדירה",
+      "noAccommodation": "הדירה עוד לא הוזמנה",
+      "insurance": "פוליסת הביטוח שלי — פרטית לכל חבר, במסמכים",
+      "offlineNote": "המסך הזה עובד גם בלי אינטרנט"
+    },
+    "share": {
+      "action": "שתף מיקום לשעה",
+      "text": "נשתף מיקום חי לשעה הקרובה דרך וואטסאפ/מפות — האפליקציה לא שומרת מיקום",
+      "done": "נפתח שיתוף מחוץ לאפליקציה"
+    },
+    "feed": {
+      "addPlaceholder": "הוסיפו הערה ליום הזה…",
+      "add": "שלח",
+      "empty": "אין עדכונים ליום הזה עדיין",
+      "openPolls": "סקרים פתוחים",
+      "openPollsHint": "{count} סקרים פתוחים · {votes} הצביעו עד עכשיו",
+      "pendingNote": "ממתין לסנכרון",
+      "systemBadge": "מערכת"
+    },
+    "errors": {
+      "invalidTransition": "מעבר סטטוס לא חוקי",
+      "ownerOnly": "רק מנהל הטיול יכול לבצע את הפעולה הזו",
+      "noteFailed": "שליחת העדכון נכשלה",
+      "statusFailed": "עדכון הסטטוס נכשל",
+      "queuedOffline": "אין חיבור — העדכון יישלח כשנחזור לרשת"
+    }
+  }
+}
