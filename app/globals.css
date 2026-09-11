@@ -66,26 +66,60 @@
   --color-exp-pending: var(--c-exp-pending);
   --color-exp-settled: var(--c-exp-settled);
   --color-exp-disputed: var(--c-exp-disputed);
+
+  /* Field-journal accents (docs/13 §5 — Warm Urban Field Journal) */
+  --color-accent-paprika: var(--c-accent-paprika);
+  --color-accent-gold: var(--c-accent-gold);
+  --color-accent-lilac: var(--c-accent-lilac);
+
+  /* Deterministic member identity colours (docs/05 §7). Slot bg + ink pairs
+     are AA-verified per theme; mapping lives in lib/utils/member-style.ts. */
+  --color-member-1: var(--c-member-1);
+  --color-member-1-ink: var(--c-member-1-ink);
+  --color-member-2: var(--c-member-2);
+  --color-member-2-ink: var(--c-member-2-ink);
+  --color-member-3: var(--c-member-3);
+  --color-member-3-ink: var(--c-member-3-ink);
+  --color-member-4: var(--c-member-4);
+  --color-member-4-ink: var(--c-member-4-ink);
+  --color-member-pending: var(--c-member-pending);
+  --color-member-pending-ink: var(--c-member-pending-ink);
 }
 
+/* Warm paper light theme — ink on paper, Budapest teal, paprika/gold accents. */
 :root {
-  --c-brand: #0e7490;
-  --c-brand-strong: #155e75;
-  --c-brand-soft: #cffafe;
+  --c-brand: #0e7c74;
+  --c-brand-strong: #0b645d;
+  --c-brand-soft: #d9efec;
   --c-brand-contrast: #ffffff;
 
-  --c-background: #f8fafc;
-  --c-surface: #ffffff;
+  --c-background: #f7f4ee;
+  --c-surface: #fffdf8;
   --c-surface-raised: #ffffff;
-  --c-border: #e2e8f0;
-  --c-text-primary: #0f172a;
-  --c-text-secondary: #334155;
-  --c-text-muted: #64748b;
+  --c-border: #e6e0d2;
+  --c-text-primary: #17150f;
+  --c-text-secondary: #453f31;
+  --c-text-muted: #6f6a5e;
 
-  --c-success: #15803d;
-  --c-warning: #b45309;
-  --c-danger: #b91c1c;
+  --c-success: #1d7a4d;
+  --c-warning: #a35f0d;
+  --c-danger: #b3352d;
   --c-info: #1d4ed8;
+
+  --c-accent-paprika: #e4572e;
+  --c-accent-gold: #d9992b;
+  --c-accent-lilac: #7c6ff0;
+
+  --c-member-1: #0b645d;
+  --c-member-1-ink: #ffffff;
+  --c-member-2: #b23a17;
+  --c-member-2-ink: #ffffff;
+  --c-member-3: #96690f;
+  --c-member-3-ink: #ffffff;
+  --c-member-4: #5a4bd1;
+  --c-member-4-ink: #ffffff;
+  --c-member-pending: #5b6570;
+  --c-member-pending-ink: #ffffff;
 
   --c-cat-food: #ea580c;
   --c-cat-attraction: #7c3aed;
@@ -100,7 +134,7 @@
   --c-st-planned: #64748b;
   --c-st-confirmed: #15803d;
   --c-st-in-progress: #b45309;
-  --c-st-completed: #0e7490;
+  --c-st-completed: #0e7c74;
   --c-st-skipped: #94a3b8;
   --c-st-cancelled: #b91c1c;
 
@@ -111,23 +145,38 @@
 
 /* Dark overrides, activated by `.dark` on <html> (auto-dark / manual override). */
 .dark {
-  --c-brand: #22d3ee;
-  --c-brand-strong: #67e8f9;
-  --c-brand-soft: #164e63;
-  --c-brand-contrast: #082f3f;
+  --c-brand: #2dd4c4;
+  --c-brand-strong: #5eead4;
+  --c-brand-soft: #134e4a;
+  --c-brand-contrast: #062e2b;
 
-  --c-background: #0b1220;
-  --c-surface: #111c2e;
-  --c-surface-raised: #1a2740;
-  --c-border: #2a3a55;
-  --c-text-primary: #f1f5f9;
-  --c-text-secondary: #cbd5e1;
-  --c-text-muted: #94a3b8;
+  --c-background: #0b0c0f;
+  --c-surface: #14161c;
+  --c-surface-raised: #1c1f28;
+  --c-border: #2b2e39;
+  --c-text-primary: #f2efe7;
+  --c-text-secondary: #ccc7ba;
+  --c-text-muted: #a7a294;
 
   --c-success: #4ade80;
   --c-warning: #fbbf24;
-  --c-danger: #f87171;
+  --c-danger: #fb7185;
   --c-info: #60a5fa;
+
+  --c-accent-paprika: #ff7a52;
+  --c-accent-gold: #f6bd4f;
+  --c-accent-lilac: #a79bff;
+
+  --c-member-1: #2dd4c4;
+  --c-member-1-ink: #062825;
+  --c-member-2: #ff7a52;
+  --c-member-2-ink: #2b0d04;
+  --c-member-3: #f6bd4f;
+  --c-member-3-ink: #241a05;
+  --c-member-4: #a79bff;
+  --c-member-4-ink: #120c2e;
+  --c-member-pending: #8b95a3;
+  --c-member-pending-ink: #0b0c0f;
 
   --c-cat-food: #fb923c;
   --c-cat-attraction: #a78bfa;
@@ -225,6 +274,14 @@
 /* Bidi isolation for mixed Hebrew + numbers/latin runs (§2). */
 @utility bidi-iso {
   unicode-bidi: isolate;
+}
+
+/* Warm field-journal card elevation — soft ink shadow, deeper in dark mode. */
+@utility card-shadow {
+  box-shadow: 0 8px 24px -14px rgb(23 21 15 / 22%);
+}
+.dark .card-shadow {
+  box-shadow: 0 10px 30px -16px rgb(0 0 0 / 65%);
 }
 
 /* Isolated LTR run: times, phone numbers, amounts, codes (§2). */

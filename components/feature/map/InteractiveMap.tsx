@@ -81,6 +81,9 @@ export default function InteractiveMap({
     map.addControl(new NavigationControl({ showCompass: false }), "top-left");
     map.addControl(new AttributionControl({ compact: true }), "bottom-right");
     map.on("load", () => {
+      const brand =
+        getComputedStyle(document.documentElement).getPropertyValue("--c-brand").trim() ||
+        "#0e7c74";
       map.addSource("selection-line", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -89,7 +92,7 @@ export default function InteractiveMap({
         id: "selection-line",
         type: "line",
         source: "selection-line",
-        paint: { "line-color": "#0e7490", "line-width": 3, "line-dasharray": [2, 2] },
+        paint: { "line-color": brand, "line-width": 3, "line-dasharray": [2, 2] },
       });
     });
     mapRef.current = map;

@@ -493,17 +493,27 @@ the device can encode the selected image.
 
 ### Phase 6 — Shared profile and visual refinement
 
-Status: **NOT STARTED**
+Status: **IMPLEMENTED; VISUAL/DEVICE UAT PENDING**
 
-- [ ] Reuse authenticated Supabase profile identity; never add the demo's local identity picker.
-- [ ] Add a compact current-member profile/avatar affordance to the header or More screen.
-- [ ] Show active/pending state clearly without exposing email addresses in shared views.
-- [ ] Allow only self-owned profile fields to be edited under existing RLS.
-- [ ] Use initials and deterministic member colours from one shared mapping.
-- [ ] Apply field-journal tokens consistently across Header, Card, BottomSheet, Money, Map, Media,
-  and More.
-- [ ] Keep visual changes restrained and measure bundle/paint impact.
-- [ ] Verify contrast, focus, reduced motion, dark theme, RTL, and 48 px touch targets.
+- [x] Reuse authenticated Supabase profile identity; never add the demo's local identity picker.
+  `lib/actions/profile.ts#getMyProfileAction` returns only the caller's own row.
+- [x] Add a compact current-member profile/avatar affordance to the header or More screen
+  (`components/feature/more/ProfileCard.tsx`, rendered on `/more`).
+- [x] Show active/pending state clearly without exposing email addresses in shared views.
+- [x] Allow only self-owned profile fields to be edited under existing RLS. Enforced by the
+  existing `profiles` policies; the card is display-only by design (names are seeded from the
+  private allowlist — no self-rename UI in this phase).
+- [x] Use initials and deterministic member colours from one shared mapping
+  (`lib/utils/member-style.ts`: stable FNV-1a hash of display name → 4 colour slots + neutral
+  pending slot; AA-verified bg/ink token pairs per theme).
+- [x] Apply field-journal tokens consistently across Header, Card, BottomSheet, Money, Map, Media,
+  and More: warm paper/ink palette swap in `globals.css` (all screens consume tokens), Budapest
+  teal brand, `card-shadow` elevation utility, extrabold display headers, regenerated PWA icons,
+  manifest/viewport colours aligned.
+- [x] Keep visual changes restrained and measure bundle/paint impact. No new dependencies, no
+  Framer Motion, no ambient blur meshes; palette swap is CSS-variable-only.
+- [ ] Verify contrast, focus, reduced motion, dark theme, RTL, and 48 px touch targets. Contrast
+  pairs computed and recorded in docs/05 §4; device visual matrix still pending.
 
 Exit gate: identity is secure and clear, visual language is cohesive, and no demo-only insecure
 identity mechanism is present.
@@ -738,6 +748,34 @@ Every checkpoint entry must include:
 - Exact next action: after deploy smoke test, start Phase 6 (profile identity + warm field-journal
   visual refinement), then Phase 7 manual UAT items.
 
+### Checkpoint 3 — Release deployed; Phase 6 design line implemented
+
+- Timestamp: 2026-09-11 12:05 (Asia/Jerusalem)
+- Agent: continuation session (opencode).
+- Release: commit `ab17f40` pushed to `main` (explicit user authorization); Vercel production
+  deployment `budapestboystripsep2026-4ujjdc474` Ready in ~1m. Smoke test on
+  `https://medbadboys.vercel.app`: `/sw-manifest.js` serves `BUILD_VERSION=ab17f4093e485537`,
+  `/login` 200, `/` 307 → `/today` (auth redirect as expected).
+- Phase 6 implemented (Warm Urban Field Journal, restrained variant):
+  - `globals.css`: warm paper/ink light theme + warm dark theme, Budapest teal brand `#0e7c74`,
+    new accent tokens (paprika/gold/lilac) and five member colour slots (bg + AA ink per theme),
+    `card-shadow` elevation utility. All screens inherit via existing semantic tokens.
+  - `lib/utils/member-style.ts`: single shared deterministic mapping (FNV-1a hash of display
+    name → slot 1–4; pending slot neutral). `MemberAvatar` fallback now renders member colours.
+  - `lib/actions/profile.ts` + `components/feature/more/ProfileCard.tsx`: authenticated,
+    self-only profile card on `/more` (name, avatar, active/pending state, role; never email).
+    `/more` stays statically prerendered — profile loads via server action + TanStack Query.
+  - `Header`: extrabold tracking-tight display title. `Card`: warm shadow. Map route-line colour
+    resolves the brand token at runtime. `manifest.ts`/`layout.tsx` theme colours aligned;
+    PWA icons regenerated with the new teal gradient (`scripts/generate-icons.mjs`).
+  - i18n: new `profile.*` section in `messages/he.json`. Docs updated: `docs/05` §3–4 palette,
+    contrast pairs, member-colour table, MemberAvatar spec.
+- Decisions: no Framer Motion / ambient meshes / glassmorphism (perf rule D10); profile card is
+  display-only (names seed from the private allowlist); Money screen untouched this phase to
+  preserve the pending mobile UAT baseline.
+- Exact next action: run full verification (lint/typecheck/test/build), commit + push the design
+  line (authorized in the same user turn), re-smoke production, then Phase 7 manual UAT matrix.
+
 ## 11. Current progress summary
 
 | Phase | Status | Exit gate |
@@ -748,5 +786,5 @@ Every checkpoint entry must include:
 | 3. Money mobile | IMPLEMENTED/PENDING UAT | Authenticated viewport matrix pending |
 | 4. Real map | IMPLEMENTED/PENDING UAT | Device tiles/location/touch checks pending |
 | 5. Media library | CORE IMPLEMENTED | Upload/edit/private/device UAT pending |
-| 6. Profiles/design | NOT STARTED | Secure coherent UI passes |
-| 7. Release verification | AUTOMATED PASS/PARTIAL | Manual authenticated gates pending |
+| 6. Profiles/design | IMPLEMENTED | Device visual matrix pending |
+| 7. Release verification | DEPLOYED `ab17f40` | Manual authenticated gates pending |

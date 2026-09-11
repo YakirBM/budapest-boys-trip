@@ -6,7 +6,7 @@
  * for anti-aliased edges.
  *
  * Brand (docs/05-ui-ux-design-system.md §4): rounded-square background with a
- * diagonal cyan/teal gradient (#0e7490 → #155e75), white two-triangle
+ * diagonal Budapest-teal gradient (#0e7c74 → #0b645d), white two-triangle
  * upward paper-plane glyph. Maskable variant keeps a ≥10% (we use ~19%)
  * safe zone; apple-touch-icon is full-bleed 180x180 with no transparency.
  *
@@ -68,8 +68,8 @@ function encodePNG(width, height, rgba) {
 /* ---------------- Rasterizer (supersampled) ---------------- */
 
 const SS = 4; // supersample factor
-const BG_A = [0x0e, 0x74, 0x90]; // brand light
-const BG_B = [0x15, 0x5e, 0x75]; // brand-strong (diagonal gradient target)
+const BG_A = [0x0e, 0x7c, 0x74]; // brand light
+const BG_B = [0x0b, 0x64, 0x5d]; // brand-strong (diagonal gradient target)
 const CORNER_RADIUS_RATIO = 0.2;
 
 function lerp(a, b, t) {

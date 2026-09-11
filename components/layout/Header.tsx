@@ -30,7 +30,9 @@ export function Header({ title, subtitle, action, className }: HeaderProps) {
       )}
     >
       <div className="min-w-0 flex-1 py-2">
-        <h1 className="truncate text-2xl font-bold leading-8 text-text-primary">{title}</h1>
+        <h1 className="truncate text-2xl font-extrabold tracking-tight text-text-primary">
+          {title}
+        </h1>
         {subtitle && <p className="truncate text-sm text-text-muted">{subtitle}</p>}
       </div>
       {action &&

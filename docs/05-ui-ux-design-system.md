@@ -52,25 +52,25 @@ Stack: Next.js 15 App Router + Tailwind CSS v4 (CSS-first `@theme` config). App 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Brand — confident teal-blue */
-  --color-brand: #0e7490;
-  --color-brand-strong: #155e75;
-  --color-brand-soft: #cffafe;
+  /* Brand — Budapest teal (Warm Urban Field Journal revision, docs/13 §5) */
+  --color-brand: #0e7c74;
+  --color-brand-strong: #0b645d;
+  --color-brand-soft: #d9efec;
   --color-brand-contrast: #ffffff;
 
-  /* Light surfaces & text */
-  --color-background: #f8fafc;
-  --color-surface: #ffffff;
+  /* Light surfaces & text — warm paper */
+  --color-background: #f7f4ee;
+  --color-surface: #fffdf8;
   --color-surface-raised: #ffffff;
-  --color-border: #e2e8f0;
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #334155;
-  --color-text-muted: #64748b;
+  --color-border: #e6e0d2;
+  --color-text-primary: #17150f;
+  --color-text-secondary: #453f31;
+  --color-text-muted: #6f6a5e;
 
   /* Feedback (light) */
-  --color-success: #15803d;
-  --color-warning: #b45309;
-  --color-danger: #b91c1c;
+  --color-success: #1d7a4d;
+  --color-warning: #a35f0d;
+  --color-danger: #b3352d;
   --color-info: #1d4ed8;
 
   /* Categories (light) */
@@ -88,7 +88,7 @@ Stack: Next.js 15 App Router + Tailwind CSS v4 (CSS-first `@theme` config). App 
   --color-st-planned: #64748b;
   --color-st-confirmed: #15803d;
   --color-st-in-progress: #b45309;
-  --color-st-completed: #0e7490;
+  --color-st-completed: #0e7c74;
   --color-st-skipped: #94a3b8;
   --color-st-cancelled: #b91c1c;
 
@@ -101,22 +101,22 @@ Stack: Next.js 15 App Router + Tailwind CSS v4 (CSS-first `@theme` config). App 
 @theme inline {
   /* Dark overrides, activated by .dark on <html> */
   .dark {
-    --color-background: #0b1220;
-    --color-surface: #111c2e;
-    --color-surface-raised: #1a2740;
-    --color-border: #2a3a55;
-    --color-text-primary: #f1f5f9;
-    --color-text-secondary: #cbd5e1;
-    --color-text-muted: #94a3b8;
+    --color-background: #0b0c0f;
+    --color-surface: #14161c;
+    --color-surface-raised: #1c1f28;
+    --color-border: #2b2e39;
+    --color-text-primary: #f2efe7;
+    --color-text-secondary: #ccc7ba;
+    --color-text-muted: #a7a294;
 
-    --color-brand: #22d3ee;
-    --color-brand-strong: #67e8f9;
-    --color-brand-soft: #164e63;
-    --color-brand-contrast: #082f3f;
+    --color-brand: #2dd4c4;
+    --color-brand-strong: #5eead4;
+    --color-brand-soft: #134e4a;
+    --color-brand-contrast: #062e2b;
 
     --color-success: #4ade80;
     --color-warning: #fbbf24;
-    --color-danger: #f87171;
+    --color-danger: #fb7185;
     --color-info: #60a5fa;
 
     --color-cat-food: #fb923c;
@@ -145,22 +145,35 @@ Stack: Next.js 15 App Router + Tailwind CSS v4 (CSS-first `@theme` config). App 
 
 ## 4. Color tokens
 
-Brand family: **cyan/teal (Tailwind cyan-700 `#0e7490` light / cyan-400 `#22d3ee` dark)** — confident, masculine, readable in sunlight, and distinct from every category color.
+Brand family: **Budapest teal (`#0e7c74` light / `#2dd4c4` dark)** — confident, masculine, readable in sunlight, and distinct from every category color. The 2026-09-11 revision (docs/13 §5, "Warm Urban Field Journal") moved surfaces/text from cool slate to warm paper/ink and added paprika/gold/lilac accents.
 
 | Token | Light | Dark |
 |---|---|---|
-| background | `#f8fafc` | `#0b1220` |
-| surface | `#ffffff` | `#111c2e` |
-| surface-raised | `#ffffff` | `#1a2740` |
-| border | `#e2e8f0` | `#2a3a55` |
-| text-primary | `#0f172a` | `#f1f5f9` |
-| text-secondary | `#334155` | `#cbd5e1` |
-| text-muted | `#64748b` | `#94a3b8` |
-| brand | `#0e7490` | `#22d3ee` |
-| success | `#15803d` | `#4ade80` |
-| warning | `#b45309` | `#fbbf24` |
-| danger | `#b91c1c` | `#f87171` |
+| background | `#f7f4ee` | `#0b0c0f` |
+| surface | `#fffdf8` | `#14161c` |
+| surface-raised | `#ffffff` | `#1c1f28` |
+| border | `#e6e0d2` | `#2b2e39` |
+| text-primary | `#17150f` | `#f2efe7` |
+| text-secondary | `#453f31` | `#ccc7ba` |
+| text-muted | `#6f6a5e` | `#a7a294` |
+| brand | `#0e7c74` | `#2dd4c4` |
+| success | `#1d7a4d` | `#4ade80` |
+| warning | `#a35f0d` | `#fbbf24` |
+| danger | `#b3352d` | `#fb7185` |
 | info | `#1d4ed8` | `#60a5fa` |
+| accent-paprika | `#e4572e` | `#ff7a52` |
+| accent-gold | `#d9992b` | `#f6bd4f` |
+| accent-lilac | `#7c6ff0` | `#a79bff` |
+
+Member identity colors: each member gets a deterministic color slot (1–4) from a stable hash of their display name — `lib/utils/member-style.ts` is the single shared mapping. Each slot defines a background + ink pair verified AA per theme; pending members use the neutral slot.
+
+| Slot | Light bg / ink | Dark bg / ink |
+|---|---|---|
+| member-1 (teal) | `#0b645d` / `#ffffff` | `#2dd4c4` / `#062825` |
+| member-2 (paprika) | `#b23a17` / `#ffffff` | `#ff7a52` / `#2b0d04` |
+| member-3 (gold) | `#96690f` / `#ffffff` | `#f6bd4f` / `#241a05` |
+| member-4 (lilac) | `#5a4bd1` / `#ffffff` | `#a79bff` / `#120c2e` |
+| pending (slate) | `#5b6570` / `#ffffff` | `#8b95a3` / `#0b0c0f` |
 
 Category colors (light / dark):
 
@@ -183,7 +196,7 @@ Status colors (light / dark):
 | planned | מתוכנן | `#64748b` | `#94a3b8` |
 | confirmed | מאושר | `#15803d` | `#4ade80` |
 | in_progress | מתבצע | `#b45309` | `#fbbf24` |
-| completed | הושלם | `#0e7490` | `#22d3ee` |
+| completed | הושלם | `#0e7c74` | `#22d3ee` |
 | skipped | דולג | `#94a3b8` | `#64748b` |
 | cancelled | בוטל | `#b91c1c` | `#f87171` |
 
@@ -194,7 +207,7 @@ Status colors (light / dark):
 | disputed | במחלוקת | `#b91c1c` | `#f87171` |
 
 Verified contrast pairs (≥ 4.5:1, WCAG AA normal text):
-`text-primary #0f172a` on `surface #ffffff` (16.1:1); `text-secondary #334155` on `surface` (10.3:1); `text-muted #64748b` on `surface` (5.0:1); `text-primary #f1f5f9` on `surface #111c2e` (14.6:1); `brand #0e7490` on `surface` (5.3:1); white `#ffffff` on `brand #0e7490` (5.3:1); dark `text-primary #f1f5f9` on `background #0b1220` (16.8:1). Category/status hues are used for icons, chips, and borders — when used as text, pair with `surface` only at the listed values or darker.
+`text-primary #17150f` on `surface #fffdf8` (17.9:1); `text-secondary #453f31` on `surface` (10.3:1); `text-muted #6f6a5e` on `surface` (5.3:1); `brand #0e7c74` on `surface` (5.0:1); white `#ffffff` on `brand #0e7c74` (5.0:1); dark `text-primary #f2efe7` on `background #0b0c0f` (17.0:1); every member-slot bg/ink pair ≥ 4.6:1 in both themes. Category/status hues are used for icons, chips, and borders — when used as text, pair with `surface` only at the listed values or darker.
 
 ## 5. Typography
 
@@ -233,7 +246,7 @@ Verified contrast pairs (≥ 4.5:1, WCAG AA normal text):
 - **MoneyAmount** — props: `amount`, `currency` (HUF|ILS|EUR|USD), `convertedTo?`. Format via `Intl.NumberFormat('he-IL', { style: 'currency', currency })`: HUF 0 decimals; ILS/EUR/USD 2 decimals. Optional secondary converted amount in caption. Always LTR-isolated.
 - **CountdownCard** — props: `targetDateTime`, `title`, `subtitle`. Hero card on היום: days/hours/minutes in display type, tabular-nums. States: pre-trip countdown, live ("הטיול התחיל!"), done (collapsed). Live region `aria-live="polite"` updating at most once per minute.
 - **TimelineItem** — props: `time`, `title`, `address`, `category`, `status`, `owner`, `navUrl`. Vertical rail with category-colored node. States: planned, confirmed, in_progress (elevated + brand ring), completed (muted, strikethrough title), skipped/cancelled (dimmed 50%).
-- **MemberAvatar** — props: `name`, `imageUrl?`, `size` (32/40px). Fallback: initials (first letters of first+last name, LTR-isolated if Latin). States: default, online dot (success color).
+- **MemberAvatar** — props: `name`, `imageUrl?`, `size` (32/40px), `pending?`. Fallback: initials (first letters of first+last name, LTR-isolated if Latin) on the member's deterministic colour slot (`lib/utils/member-style.ts`, AA-verified bg/ink pairs; neutral slot when `pending`). States: default, online dot (success color).
 - **EstimateBadge** — props: `source`, `lastVerifiedAt`. Small warning-tinted chip "הערכה" with tooltip/bottom-sheet showing source name + `last_verified_at` formatted he-IL. Mandatory on any non-verified price/schedule.
 - **OfflineBanner** — full-width banner below header when `navigator.onLine === false` or Supabase unreachable: `offline` icon + "אין חיבור — מוצג נתון שמור". Warning tint; not dismissible while offline.
 - **PendingSyncBadge** — props: `count`. Small info-tinted chip "N שינויים ממתינים לסנכרון"; appears on the More tab icon and in settings; clears on successful background sync.

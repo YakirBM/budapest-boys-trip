@@ -20,6 +20,7 @@ import { useTheme, type ThemePreference } from "@/lib/theme/ThemeProvider";
 import { Header } from "@/components/layout/Header";
 import { Card } from "@/components/ui/Card";
 import { PendingSyncBadge } from "@/components/ui/PendingSyncBadge";
+import { ProfileCard } from "@/components/feature/more/ProfileCard";
 import { useOutboxSync } from "@/lib/offline/useOutboxSync";
 
 interface MoreLink {
@@ -57,6 +58,10 @@ export default function MorePage() {
   return (
     <>
       <Header title={t("more.title")} subtitle={t("more.subtitle")} />
+
+      <section aria-label={t("profile.title")}>
+        <ProfileCard />
+      </section>
 
       <section aria-label={t("more.linksSection")} className="flex flex-col gap-2">
         {links.map(({ href, label, icon: Icon }) => (
