@@ -1,5 +1,6 @@
 import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ToastProvider } from "@/components/ui/Toast";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { QueryProvider } from "@/lib/queries/realtime";
 import { TRIP_ID } from "@/lib/data/trip";
@@ -16,6 +17,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <ToastProvider>
         <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background pt-safe">
           <OfflineBanner />
+          <AppHeader />
           <main id="main" className="flex-1 px-4 pb-nav-safe">
             {children}
           </main>

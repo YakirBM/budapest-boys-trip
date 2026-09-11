@@ -32,6 +32,41 @@
     "statusApproved": "מאושר",
     "statusScheduled": "משובץ",
     "statusVisited": "ביקרנו",
-    "statusRejected": "נפסל"
+    "statusRejected": "נפסל",
+    "pins": {
+      "addHere": "הוסף סיכה כאן",
+      "title": "סיכה חדשה",
+      "editTitle": "עריכת סיכה",
+      "fieldLabel": "תווית",
+      "fieldNote": "הערה",
+      "fieldKind": "סוג",
+      "kindCustom": "מותאם",
+      "kindMeeting": "מפגש",
+      "kindFood": "אוכל",
+      "kindWarning": "אזהרה",
+      "save": "שמור סיכה",
+      "saved": "הסיכה נשמרה",
+      "delete": "מחק סיכה",
+      "deleteConfirm": "למחוק את הסיכה? אי אפשר לבטל.",
+      "sharedHint": "סיכות משותפות לכל הקבוצה",
+      "offlineQueued": "אין חיבור — הסיכה תסונכרן בהמשך",
+      "labelRequired": "חובה למלא תווית",
+      "outOfBounds": "מחוץ לגבולות בודפשט (47.2–47.7, 18.8–19.4)"
+    },
+    "layers": {
+      "label": "שכבות מפה",
+      "essentials": "חיוניים",
+      "metro": "מטרו",
+      "kosher": "כשר",
+      "malls": "קניונים",
+      "pins": "סיכות"
+    },
+    "measure": {
+      "distance": "מרחק",
+      "walkEstimate": "כ־{minutes} דק׳ הליכה",
+      "estimateLabel": "הערכה",
+      "tapTwoPins": "הקישו על שתי סיכות למדידה",
+      "clear": "נקה מדידה"
+    }
   }
 }

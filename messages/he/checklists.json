@@ -54,6 +54,30 @@
       "urgentEmpty": "אין פריטים קריטיים פתוחים",
       "memberAria": "מוכנות {name}: {pct}%"
     },
+    "groups": {
+      "label": "קבוצות רשימות",
+      "preflight": {
+        "label": "הכנה לטיסה",
+        "hint": "כל מה שחייב להיות מוכן לפני שיוצאים לשדה",
+        "readinessTitle": "מוכנות להכנה לטיסה"
+      },
+      "travelers": {
+        "label": "מטיילים",
+        "hint": "ציוד ומשימות משותפות במהלך הטיול",
+        "readinessTitle": "מוכנות המטיילים"
+      },
+      "return": {
+        "label": "חזרה לארץ",
+        "hint": "אריזה, עזיבה וסגירות אחרי החזרה",
+        "readinessTitle": "מוכנות לחזרה"
+      }
+    },
+    "dnd": {
+      "hint": "לחיצה ארוכה לגרירה לסידור מחדש, או שימוש במקלדת",
+      "reordered": "הסדר נשמר",
+      "reorderHandleAria": "גרור את ״{title}״ לשינוי סדר",
+      "positionLabel": "{index} מתוך {total}"
+    },
     "offlineQueuedToast": "השינוי נשמר במכשיר ויסונכרן בחיבור",
     "errors": {
       "generic": "השמירה נכשלה — נסו שוב",

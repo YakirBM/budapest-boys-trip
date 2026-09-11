@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { t } from "@/lib/i18n";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
+import { AmountInput } from "@/components/ui/AmountInput";
 import { pushToast } from "@/components/ui/Toast";
 import { formatMoney } from "@/components/ui/MoneyAmount";
 import { ExpenseCategoryIcon, expenseCategoryLabel } from "./visuals";
@@ -362,39 +363,32 @@ export function ExpenseForm({
         </div>
 
         <div>
-          <p className="mb-1 text-xs font-semibold text-text-muted">{t("money.form.amountLabel")}</p>
-          <div className="flex min-w-0 flex-col gap-2 min-[380px]:flex-row">
-            <input
-              type="text"
-              inputMode="decimal"
-              dir="ltr"
-              value={amountText}
-              onChange={(e) => setAmountText(e.target.value)}
-              placeholder={t("money.form.amountPlaceholder")}
-              aria-label={t("money.form.amountLabel")}
-              className={clsx(inputClass(), "min-w-0 flex-1 text-lg font-bold tnum")}
-            />
-            <div
-              role="radiogroup"
-              aria-label={currency}
-              className="grid shrink-0 grid-cols-4 gap-1 rounded-xl bg-surface-raised p-1 min-[380px]:grid-cols-2"
-            >
-              {CURRENCIES.map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  role="radio"
-                  aria-checked={currency === code}
-                  onClick={() => setCurrency(code)}
-                  className={clsx(
-                    "min-h-10 min-w-0 rounded-lg px-1 text-xs font-bold transition-[background-color,color] min-[380px]:min-w-14 min-[380px]:px-2",
-                    currency === code ? "bg-brand text-brand-contrast" : "text-text-secondary",
-                  )}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
+          <AmountInput
+            value={amountText}
+            onChange={setAmountText}
+            currency={currency}
+            label={t("money.form.amountLabel")}
+          />
+          <div
+            role="radiogroup"
+            aria-label={currency}
+            className="mt-2 grid shrink-0 grid-cols-4 gap-1 rounded-xl bg-surface-raised p-1 min-[380px]:grid-cols-4"
+          >
+            {CURRENCIES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                role="radio"
+                aria-checked={currency === code}
+                onClick={() => setCurrency(code)}
+                className={clsx(
+                  "min-h-12 min-w-0 rounded-lg px-1 text-xs font-bold transition-[background-color,color] min-[380px]:px-2",
+                  currency === code ? "bg-brand text-brand-contrast" : "text-text-secondary",
+                )}
+              >
+                <span dir="ltr" className="tnum">{code}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -599,29 +593,19 @@ export function ExpenseForm({
           </>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-text-muted">{t("money.form.tipLabel")}</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              dir="ltr"
-              value={tipText}
-              onChange={(e) => setTipText(e.target.value)}
-              className={inputClass("tnum")}
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-semibold text-text-muted">{t("money.form.feeLabel")}</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              dir="ltr"
-              value={feeText}
-              onChange={(e) => setFeeText(e.target.value)}
-              className={inputClass("tnum")}
-            />
-          </label>
+        <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+          <AmountInput
+            value={tipText}
+            onChange={setTipText}
+            currency={currency}
+            label={t("money.form.tipLabel")}
+          />
+          <AmountInput
+            value={feeText}
+            onChange={setFeeText}
+            currency={currency}
+            label={t("money.form.feeLabel")}
+          />
         </div>
 
         <label className="flex flex-col gap-1">

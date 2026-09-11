@@ -12,6 +12,10 @@ export interface ReadinessWidgetProps {
   members: { user_id: string; full_name: string }[];
   /** The readiness list (defaults to the first list = pre-flight by sort order). */
   listId?: string;
+  /** Per-group mode (docs/14 §4): aggregate across these list ids instead. */
+  listIds?: string[];
+  /** Override the widget title (per-group readiness titles live under checklists.groups.*). */
+  title?: string;
   className?: string;
 }
 
@@ -27,15 +31,22 @@ function progressOf(items: ChecklistItemRow[]): { done: number; total: number; p
  * assigned items + the single most urgent open critical item.
  * Exported for the Today dashboard — keep it a pure component over props.
  */
-export function ReadinessWidget({ board, members, listId, className }: ReadinessWidgetProps) {
-  const targetList = useMemo(
-    () => board.lists.find((l) => l.id === listId) ?? board.lists[0],
-    [board.lists, listId],
-  );
-  const listItems = useMemo(
-    () => (targetList ? board.items.filter((i) => i.checklist_id === targetList.id) : []),
-    [board.items, targetList],
-  );
+export function ReadinessWidget({ board, members, listId, listIds, title, className }: ReadinessWidgetProps) {
+  const targetLists = useMemo(() => {
+    if (listIds && listIds.length > 0) {
+      const wanted = new Set(listIds);
+      const matched = board.lists.filter((l) => wanted.has(l.id));
+      return matched.length > 0 ? matched : [];
+    }
+    const single = board.lists.find((l) => l.id === listId) ?? board.lists[0];
+    return single ? [single] : [];
+  }, [board.lists, listId, listIds]);
+  const targetList = targetLists[0];
+  const listItems = useMemo(() => {
+    if (targetLists.length === 0) return [];
+    const wanted = new Set(targetLists.map((l) => l.id));
+    return board.items.filter((i) => wanted.has(i.checklist_id));
+  }, [board.items, targetLists]);
   const overall = progressOf(listItems);
 
   const memberBars = useMemo(() => {
@@ -56,10 +67,14 @@ export function ReadinessWidget({ board, members, listId, className }: Readiness
 
   if (!targetList) return null;
 
+  const heading = title ?? t("checklists.readiness.title");
+  const contextLabel =
+    targetLists.length === 1 ? targetList.title : targetLists.map((l) => l.title).join(", ");
+
   return (
     <Card className={className}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-text-primary">{t("checklists.readiness.title")}</h2>
+        <h2 className="text-base font-semibold text-text-primary">{heading}</h2>
         <span className="text-xs font-bold text-brand" dir="ltr">
           {t("checklists.readiness.overall", { pct: overall.pct })}
         </span>
@@ -76,7 +91,7 @@ export function ReadinessWidget({ board, members, listId, className }: Readiness
         <span className="block h-full rounded-full bg-brand" style={{ width: `${overall.pct}%` }} />
       </div>
       <p className="mt-1 text-xs text-text-muted" dir="ltr">
-        {t("checklists.progressLabel", { done: overall.done, total: overall.total })} · {targetList.title}
+        {t("checklists.progressLabel", { done: overall.done, total: overall.total })} · {contextLabel}
       </p>
 
       {memberBars.length > 0 && (

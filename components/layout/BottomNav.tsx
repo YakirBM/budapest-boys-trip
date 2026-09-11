@@ -3,31 +3,34 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Map, MoreHorizontal, Route, Wallet, type LucideIcon } from "lucide-react";
+import { CalendarDays, Images, ListChecks, Wallet, type LucideIcon } from "lucide-react";
 import { t } from "@/lib/i18n";
 
 interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Extra paths that keep this tab highlighted (deep views inside the tab). */
+  aliases: string[];
 }
 
 const items: NavItem[] = [
-  { href: "/today", label: t("nav.today"), icon: Home },
-  { href: "/route", label: t("nav.route"), icon: Route },
-  { href: "/map", label: t("nav.map"), icon: Map },
-  { href: "/money", label: t("nav.money"), icon: Wallet },
-  { href: "/more", label: t("nav.more"), icon: MoreHorizontal },
+  { href: "/today", label: t("nav.ourDay"), icon: CalendarDays, aliases: ["/route", "/map"] },
+  { href: "/checklists", label: t("nav.lists"), icon: ListChecks, aliases: [] },
+  { href: "/money", label: t("nav.money"), icon: Wallet, aliases: [] },
+  { href: "/media", label: t("nav.memories"), icon: Images, aliases: [] },
 ];
 
-function isActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, item: NavItem): boolean {
+  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
+  return item.aliases.some((alias) => pathname === alias || pathname.startsWith(`${alias}/`));
 }
 
 /**
- * BottomNav — 64px + safe-area, 5 items (היום · מסלול · מפה · כספים · עוד),
- * active = brand color + 12px top indicator (doc 05 §6). Icons are object/
- * state icons (never mirrored): home, route, map, wallet, more.
+ * BottomNav — 64px + safe-area, 4 items (Our Day · Lists · Money ·
+ * Memory Wall), active = brand color + 12px top indicator (doc 05 §6).
+ * /route and /map keep resolving as deep views inside "Our Day" (docs/14 §2).
+ * Icons are object/state icons (never mirrored).
  */
 export function BottomNav() {
   const pathname = usePathname();
@@ -36,16 +39,17 @@ export function BottomNav() {
   return (
     <nav aria-label={t("nav.label")} className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-safe backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-md items-stretch">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
+        {items.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(pathname, item);
           return (
             <Link
-              key={href}
-              href={href}
+              key={item.href}
+              href={item.href}
               aria-current={active ? "page" : undefined}
-              onPointerEnter={() => router.prefetch(href)}
-              onFocus={() => router.prefetch(href)}
-              onTouchStart={() => router.prefetch(href)}
+              onPointerEnter={() => router.prefetch(item.href)}
+              onFocus={() => router.prefetch(item.href)}
+              onTouchStart={() => router.prefetch(item.href)}
               className={clsx(
                 "relative flex min-w-12 flex-1 flex-col items-center justify-center gap-1 rounded-lg",
                 "transition-colors duration-150",
@@ -60,7 +64,7 @@ export function BottomNav() {
               )}
               <Icon aria-hidden size={24} strokeWidth={active ? 2.4 : 2} />
               <span className={clsx("text-[11px] leading-4", active ? "font-bold" : "font-medium")}>
-                {label}
+                {item.label}
               </span>
             </Link>
           );

@@ -104,6 +104,13 @@
       "title": "ממיר מט״ח",
       "from": "מ־",
       "to": "ל־",
+      "refresh": "רענן שער",
+      "refreshedAt": "עודכן: {time}",
+      "staleHint": "השער שמור — יעודכן בחיבור",
+      "offlineHint": "אין חיבור — מוצג שער שמור",
+      "swap": "החלפה בין המטבעות",
+      "calculated": "מחושב מהשער ההפוך",
+      "source": "מקור: {source}",
       "amountLabel": "סכום",
       "rateLabel": "השער בשימוש",
       "manualRateToggle": "הזנת שער ידני",
@@ -114,6 +121,39 @@
       "feeLine": "כולל עמלה של {fee}%",
       "disclaimer": "חיוב כרטיס בפועל עשוי להיות שונה מהשער המוצג (mid-market)",
       "noRate": "אין שער מאומת לזיווג הזה — אפשר להזין שער ידני לחישוב בלבד"
+    },
+    "amount": {
+      "hint": "הקלידו סכום — נקודה או פסיק לעשרוני",
+      "decimals": "נקודה או פסיק לעשרוני — HUF ללא עשרוני",
+      "preview": "תצוגה מקדימה: {amount}"
+    },
+    "balances": {
+      "owedTo": "{name} — החברים חייבים לו {amount}",
+      "owesDetail": "{name} — חייב {amount}",
+      "settledClean": "{name} — סגור, לא חייב ולא חייבים לו",
+      "owesToEach": "ל{name} {amount}",
+      "breakdownWrap": "{base} ({list})"
+    },
+    "transfer": {
+      "repayFor": "החזר על “{title}”",
+      "participants": "{count} משתתפים",
+      "paidDone": "✓ בוצע",
+      "settlementReason": "התחשבנות קבוצתית"
+    },
+    "reports": {
+      "title": "דוחות",
+      "byCategory": "לפי קטגוריה",
+      "byDay": "לפי יום",
+      "byMember": "לפי חבר",
+      "empty": "אין עדיין נתונים לדוחות",
+      "estimated": "הערכה — מעורב מט״ח",
+      "total": "סה״כ {amount}"
+    },
+    "expense": {
+      "paidLine": "{name} שילם {amount}",
+      "splitAmong": "מתחלק בין {names} ({count})",
+      "splitSingle": "{names} — משתתף יחיד",
+      "when": "יום {day} · {time}"
     },
     "fx": {
       "caption": "שער עדכני: 1 HUF = {rate} {quote}",

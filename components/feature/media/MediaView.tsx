@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, FolderPlus, Heart, Lock, Loader2, Pencil, Search, Star, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -13,20 +13,13 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cacheSnapshot, readSnapshot } from "@/lib/offline/db";
 import {
   addMediaCommentAction,
-  createMediaAlbumAction,
   registerMediaItemAction,
   setMediaVisibilityAction,
   softDeleteMediaAction,
   toggleMediaLikeAction,
   updateMediaMetadataAction,
 } from "@/lib/actions/media";
-import type {
-  MediaAlbumRow,
-  MediaBoard,
-  MediaItemRow,
-  MediaPlaceRow,
-  MediaReactionRow,
-} from "@/lib/data/media";
+import type { MediaBoard, MediaPlaceRow, MediaReactionRow } from "@/lib/data/media";
 import type { TripMember } from "@/lib/data/trip";
 import { compressImage, isAllowedImageFile, sha256Hex, MAX_INPUT_BYTES } from "@/lib/utils/image";
 import {
@@ -38,6 +31,17 @@ import {
   type MediaVisibilityFilter,
 } from "@/lib/utils/media";
 import { getSignedUrls, peekSignedUrl } from "./signedUrlCache";
+import { AddressAutocomplete } from "./AddressAutocomplete";
+import { ViewSwitcher } from "./ViewSwitcher";
+import { AlbumsPane, DaysPane, MapPane, PeoplePane, PlacesPane } from "./MediaPanes";
+import { createAlbumWithVisibility, updateMediaExtendedColumns } from "./album-actions";
+import {
+  isMediaWallView,
+  peopleOf,
+  placeOf,
+  type MediaWallView,
+  type WallViewItem,
+} from "./media-views";
 
 export interface MediaViewProps {
   tripId: string;
@@ -49,10 +53,53 @@ export interface MediaViewProps {
   isPreTrip: boolean;
 }
 
+/**
+ * Wall item: legacy row + §6 organization columns (migration 0022). New
+ * columns fall back to their legacy mirrors so pre-migration rows stay valid.
+ * Structurally compatible with WallViewItem (docs/14 §6.3, one source).
+ */
+export interface WallItem {
+  id: string;
+  uploader_id: string;
+  storage_path: string;
+  thumbnail_path: string | null;
+  width: number | null;
+  height: number | null;
+  day_number: number | null;
+  caption: string | null;
+  visibility: "group" | "private";
+  is_moment_of_day: boolean;
+  uploaded_at: string;
+  size_bytes: number | null;
+  mime_stored: string;
+  title: string | null;
+  original_filename: string | null;
+  album_id: string | null;
+  linked_place_id: string | null;
+  tagged_member_ids: string[];
+  tags: string[];
+  people: string[];
+  place_id: string | null;
+  address_text: string | null;
+  taken_at: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
+export interface WallAlbum {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string;
+  visibility: "shared" | "private";
+  owner_id: string | null;
+  cover_item_id: string | null;
+}
+
 interface MediaPayload {
-  items: MediaItemRow[];
+  items: WallItem[];
   reactions: MediaReactionRow[];
-  albums: MediaAlbumRow[];
+  albums: WallAlbum[];
   places: MediaPlaceRow[];
   stale: boolean;
 }
@@ -66,48 +113,127 @@ interface UploadTile {
 
 const MEDIA_CACHE_KEY = "media";
 
+const LEGACY_ITEM_SELECT =
+  "id,uploader_id,storage_path,thumbnail_path,width,height,day_number,caption,visibility,is_moment_of_day,uploaded_at,size_bytes,mime_stored,title,original_filename,album_id,linked_place_id,tagged_member_ids,tags";
+const FULL_ITEM_SELECT = `${LEGACY_ITEM_SELECT},people,place_id,address_text,taken_at,lat,lng`;
+const LEGACY_ALBUM_SELECT = "id,name,description,created_by";
+const FULL_ALBUM_SELECT = "id,name,description,created_by,visibility,owner_id,cover_item_id";
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((entry) => String(entry)) : [];
+}
+
+function asOptionalString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function asNumberOrNull(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/** PostgREST "unknown column" (PGRST204 / schema-cache) → retry legacy select. */
+function isMissingColumnError(err: unknown): boolean {
+  if (err === null || typeof err !== "object") return false;
+  const record = err as Record<string, unknown>;
+  const message = typeof record["message"] === "string" ? record["message"] : "";
+  const code = typeof record["code"] === "string" ? record["code"] : "";
+  return (
+    code === "PGRST204" ||
+    /column .* does not exist|schema cache|Could not find the '.*' column/i.test(message)
+  );
+}
+
+function normalizeItem(row: Record<string, unknown>): WallItem {
+  const linkedPlace = asOptionalString(row["linked_place_id"]);
+  return {
+    id: String(row["id"] ?? ""),
+    uploader_id: String(row["uploader_id"] ?? ""),
+    storage_path: String(row["storage_path"] ?? ""),
+    thumbnail_path: asOptionalString(row["thumbnail_path"]),
+    width: asNumberOrNull(row["width"]),
+    height: asNumberOrNull(row["height"]),
+    day_number: asNumberOrNull(row["day_number"]),
+    caption: asOptionalString(row["caption"]),
+    visibility: row["visibility"] === "private" ? "private" : "group",
+    is_moment_of_day: Boolean(row["is_moment_of_day"]),
+    uploaded_at: String(row["uploaded_at"] ?? ""),
+    size_bytes: asNumberOrNull(row["size_bytes"]),
+    mime_stored: asOptionalString(row["mime_stored"]) ?? "image/webp",
+    title: asOptionalString(row["title"]),
+    original_filename: asOptionalString(row["original_filename"]),
+    album_id: asOptionalString(row["album_id"]),
+    linked_place_id: linkedPlace,
+    tagged_member_ids: asStringArray(row["tagged_member_ids"]),
+    tags: asStringArray(row["tags"]),
+    people: asStringArray(row["people"]),
+    place_id: asOptionalString(row["place_id"]) ?? linkedPlace,
+    address_text: asOptionalString(row["address_text"]),
+    taken_at: asOptionalString(row["taken_at"]),
+    lat: asNumberOrNull(row["lat"]),
+    lng: asNumberOrNull(row["lng"]),
+  };
+}
+
+function normalizeAlbum(row: Record<string, unknown>): WallAlbum {
+  return {
+    id: String(row["id"] ?? ""),
+    name: String(row["name"] ?? ""),
+    description: asOptionalString(row["description"]),
+    created_by: String(row["created_by"] ?? ""),
+    visibility: row["visibility"] === "private" ? "private" : "shared",
+    owner_id: asOptionalString(row["owner_id"]),
+    cover_item_id: asOptionalString(row["cover_item_id"]),
+  };
+}
+
+function normalizeReaction(row: Record<string, unknown>): MediaReactionRow {
+  return {
+    id: String(row["id"]),
+    media_id: String(row["media_id"]),
+    member_id: String(row["member_id"]),
+    kind: row["kind"] === "comment" ? "comment" : "like",
+    body: row["body"] === null ? null : String(row["body"]),
+    created_at: String(row["created_at"] ?? ""),
+  };
+}
+
 async function fetchMedia(tripId: string): Promise<MediaPayload> {
   const supabase = getSupabaseBrowserClient();
   try {
-    const [itemsRes, albumsRes, placesRes] = await Promise.all([
+    const itemsQuery = (select: string) =>
       supabase
         .from("media_items")
-        .select(
-          "id,uploader_id,storage_path,thumbnail_path,width,height,day_number,caption,visibility,is_moment_of_day,uploaded_at,size_bytes,mime_stored,title,original_filename,album_id,linked_place_id,tagged_member_ids,tags",
-        )
+        .select(select)
         .eq("trip_id", tripId)
         .eq("status", "active")
         .order("uploaded_at", { ascending: false })
-        .limit(240),
-      supabase.from("media_albums").select("id,name,description,created_by").eq("trip_id", tripId).order("name"),
+        .limit(240);
+    const albumsQuery = (select: string) =>
+      supabase.from("media_albums").select(select).eq("trip_id", tripId).order("name");
+    const fetched = await Promise.all([
+      itemsQuery(FULL_ITEM_SELECT),
+      albumsQuery(FULL_ALBUM_SELECT),
       supabase.from("places").select("id,name").eq("trip_id", tripId).neq("status", "rejected").order("name"),
     ]);
+    let itemsRes = fetched[0];
+    let albumsRes = fetched[1];
+    const placesRes = fetched[2];
+    // Pre-0022 schema: the new organization columns do not exist yet.
+    if (itemsRes.error && isMissingColumnError(itemsRes.error)) {
+      itemsRes = await itemsQuery(LEGACY_ITEM_SELECT);
+    }
+    if (albumsRes.error && isMissingColumnError(albumsRes.error)) {
+      albumsRes = await albumsQuery(LEGACY_ALBUM_SELECT);
+    }
     if (itemsRes.error) throw itemsRes.error;
     if (albumsRes.error) throw albumsRes.error;
     if (placesRes.error) throw placesRes.error;
-    const items = ((itemsRes.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-      id: String(row["id"]),
-      uploader_id: String(row["uploader_id"]),
-      storage_path: String(row["storage_path"]),
-      thumbnail_path: row["thumbnail_path"] === null ? null : String(row["thumbnail_path"]),
-      width: row["width"] === null ? null : Number(row["width"]),
-      height: row["height"] === null ? null : Number(row["height"]),
-      day_number: row["day_number"] === null ? null : Number(row["day_number"]),
-      caption: row["caption"] === null ? null : String(row["caption"]),
-      visibility: (row["visibility"] === "private" ? "private" : "group") as "group" | "private",
-      is_moment_of_day: Boolean(row["is_moment_of_day"]),
-      uploaded_at: String(row["uploaded_at"]),
-      size_bytes: row["size_bytes"] === null ? null : Number(row["size_bytes"]),
-      mime_stored: String(row["mime_stored"] ?? "image/webp"),
-      title: row["title"] === null ? null : String(row["title"]),
-      original_filename: row["original_filename"] === null ? null : String(row["original_filename"]),
-      album_id: row["album_id"] === null ? null : String(row["album_id"]),
-      linked_place_id: row["linked_place_id"] === null ? null : String(row["linked_place_id"]),
-      tagged_member_ids: Array.isArray(row["tagged_member_ids"])
-        ? row["tagged_member_ids"].map(String)
-        : [],
-      tags: Array.isArray(row["tags"]) ? row["tags"].map(String) : [],
-    }));
+    const items = ((itemsRes.data ?? []) as unknown as Record<string, unknown>[]).map(normalizeItem);
     const itemIds = items.map((i) => i.id);
     const reactionsRes =
       itemIds.length > 0
@@ -122,20 +248,8 @@ async function fetchMedia(tripId: string): Promise<MediaPayload> {
 
     const payload: MediaPayload = {
       items,
-      reactions: ((reactionsRes.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
-        id: String(row["id"]),
-        media_id: String(row["media_id"]),
-        member_id: String(row["member_id"]),
-        kind: row["kind"] === "comment" ? "comment" : "like",
-        body: row["body"] === null ? null : String(row["body"]),
-        created_at: String(row["created_at"]),
-      })),
-      albums: (albumsRes.data ?? []).map((row) => ({
-        id: String(row.id),
-        name: String(row.name),
-        description: row.description === null ? null : String(row.description),
-        created_by: String(row.created_by),
-      })),
+      reactions: ((reactionsRes.data ?? []) as unknown as Record<string, unknown>[]).map(normalizeReaction),
+      albums: ((albumsRes.data ?? []) as unknown as Record<string, unknown>[]).map(normalizeAlbum),
       places: (placesRes.data ?? []).map((row) => ({ id: String(row.id), name: String(row.name) })),
       stale: false,
     };
@@ -148,7 +262,12 @@ async function fetchMedia(tripId: string): Promise<MediaPayload> {
     return payload;
   } catch (err) {
     const snap = await readSnapshot<Omit<MediaPayload, "stale">>(MEDIA_CACHE_KEY);
-    if (snap) return { ...snap.data, stale: true };
+    if (snap) {
+      // Offline snapshot: rows may predate migration 0022 — normalize.
+      const snapItems = (snap.data.items as unknown as Record<string, unknown>[]).map(normalizeItem);
+      const snapAlbums = (snap.data.albums as unknown as Record<string, unknown>[]).map(normalizeAlbum);
+      return { ...snap.data, items: snapItems, albums: snapAlbums, stale: true };
+    }
     throw err;
   }
 }
@@ -206,9 +325,9 @@ function ThumbImage({
 export function MediaView({ tripId, initial, members, userId, defaultDay, isPreTrip }: MediaViewProps) {
   const queryClient = useQueryClient();
   const [viewerId, setViewerId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<MediaItemRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WallItem | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [editTarget, setEditTarget] = useState<MediaItemRow | null>(null);
+  const [editTarget, setEditTarget] = useState<WallItem | null>(null);
   const [dayFilter, setDayFilter] = useState<number | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
   const [albumFilter, setAlbumFilter] = useState("");
@@ -218,16 +337,81 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
   const [likedOnly, setLikedOnly] = useState(false);
   const [sortMode, setSortMode] = useState<MediaSortMode>(DEFAULT_MEDIA_SORT);
   const [search, setSearch] = useState("");
+  const [view, setView] = useState<MediaWallView>("albums");
+  const [personFilter, setPersonFilter] = useState("");
+  // Upload defaults (§6.1): applied to every photo picked in this session.
+  const [upAlbumId, setUpAlbumId] = useState("");
+  const [upNewAlbumName, setUpNewAlbumName] = useState("");
+  const [upNewAlbumVisibility, setUpNewAlbumVisibility] = useState<"shared" | "private">("shared");
+  const [upCreatingAlbum, setUpCreatingAlbum] = useState(false);
+  const [upPeople, setUpPeople] = useState<string[]>([]);
+  const [upPlaceId, setUpPlaceId] = useState("");
+  const [upAddress, setUpAddress] = useState("");
+  const [upLat, setUpLat] = useState<number | null>(null);
+  const [upLng, setUpLng] = useState<number | null>(null);
   const [uploads, setUploads] = useState<UploadTile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // View + filters persist in URL params (?view=, ?day=, …) for deep-linking.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const nextView = params.get("view");
+    if (nextView && isMediaWallView(nextView)) setView(nextView);
+    const day = params.get("day");
+    if (day !== null && ["1", "2", "3", "4", "5"].includes(day)) setDayFilter(Number(day));
+    const album = params.get("album");
+    if (album !== null) setAlbumFilter(album);
+    const place = params.get("place");
+    if (place !== null) setPlaceFilter(place);
+    const person = params.get("person");
+    if (person !== null) setPersonFilter(person);
+    const tag = params.get("tag");
+    if (tag !== null) setTagFilter(tag);
+    const vis = params.get("vis");
+    if (vis === "group" || vis === "private") setVisibilityFilter(vis);
+    if (params.get("liked") === "1") setLikedOnly(true);
+    if (params.get("mine") === "1") setMineOnly(true);
+    const query = params.get("q");
+    if (query !== null) setSearch(query);
+    const sort = params.get("sort");
+    if (sort === "newest" || sort === "oldest" || sort === "day" || sort === "title") setSortMode(sort);
+  }, []);
+
+  const skipUrlWrite = useRef(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (skipUrlWrite.current) {
+      skipUrlWrite.current = false;
+      return;
+    }
+    const params = new URLSearchParams(window.location.search);
+    const set = (key: string, value: string): void => {
+      if (value === "") params.delete(key);
+      else params.set(key, value);
+    };
+    set("view", view);
+    set("day", dayFilter === null ? "" : String(dayFilter));
+    set("album", albumFilter);
+    set("place", placeFilter);
+    set("person", personFilter);
+    set("tag", tagFilter);
+    set("vis", visibilityFilter === "all" ? "" : visibilityFilter);
+    set("liked", likedOnly ? "1" : "");
+    set("mine", mineOnly ? "1" : "");
+    set("q", search.trim());
+    set("sort", sortMode === DEFAULT_MEDIA_SORT ? "" : sortMode);
+    const next = params.toString();
+    window.history.replaceState(null, "", next === "" ? window.location.pathname : `${window.location.pathname}?${next}`);
+  }, [view, dayFilter, albumFilter, placeFilter, personFilter, tagFilter, visibilityFilter, likedOnly, mineOnly, search, sortMode]);
 
   const mediaQ = useQuery({
     queryKey: ["media", tripId],
     queryFn: () => fetchMedia(tripId),
     initialData: {
-      items: initial.items,
+      items: (initial.items as unknown as Record<string, unknown>[]).map(normalizeItem),
       reactions: initial.reactions,
-      albums: initial.albums,
+      albums: (initial.albums as unknown as Record<string, unknown>[]).map(normalizeAlbum),
       places: initial.places,
       stale: false,
     },
@@ -263,22 +447,24 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
 
   const availableTags = useMemo(() => collectMediaTags(mediaQ.data.items), [mediaQ.data.items]);
 
-  const filtersActive = hasActiveMediaFilters({
-    day: dayFilter,
-    mineOnly,
-    albumId: albumFilter,
-    placeId: placeFilter,
-    tag: tagFilter,
-    visibility: visibilityFilter,
-    likedOnly,
-    search,
-  });
+  const filtersActive =
+    hasActiveMediaFilters({
+      day: dayFilter,
+      mineOnly,
+      albumId: albumFilter,
+      placeId: placeFilter,
+      tag: tagFilter,
+      visibility: visibilityFilter,
+      likedOnly,
+      search,
+    }) || personFilter !== "";
 
   function resetFilters(): void {
     setDayFilter(null);
     setMineOnly(false);
     setAlbumFilter("");
     setPlaceFilter("");
+    setPersonFilter("");
     setTagFilter("");
     setVisibilityFilter("all");
     setLikedOnly(false);
@@ -293,10 +479,11 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         item.title,
         item.caption,
         item.original_filename,
+        item.address_text,
         ...item.tags,
-        ...item.tagged_member_ids.map((id) => nameOf.get(id) ?? ""),
+        ...peopleOf(item).map((id) => nameOf.get(id) ?? ""),
         mediaQ.data.albums.find((album) => album.id === item.album_id)?.name,
-        mediaQ.data.places.find((place) => place.id === item.linked_place_id)?.name,
+        mediaQ.data.places.find((place) => place.id === placeOf(item))?.name,
       ]
         .filter(Boolean)
         .join(" ")
@@ -304,8 +491,9 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       return (
         (dayFilter === null || item.day_number === dayFilter) &&
         (!mineOnly || item.uploader_id === userId) &&
-        (albumFilter === "" || item.album_id === albumFilter) &&
-        (placeFilter === "" || item.linked_place_id === placeFilter) &&
+        (albumFilter === "" || (albumFilter === "none" ? item.album_id === null : item.album_id === albumFilter)) &&
+        (placeFilter === "" || (placeFilter === "none" ? placeOf(item) === null : placeOf(item) === placeFilter)) &&
+        (personFilter === "" || (personFilter === "none" ? peopleOf(item).length === 0 : peopleOf(item).includes(personFilter))) &&
         (tagFilter === "" || item.tags.includes(tagFilter)) &&
         (visibilityFilter === "all" || item.visibility === visibilityFilter) &&
         (!likedOnly || likedIds.has(item.id)) &&
@@ -313,16 +501,42 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       );
     });
     return sortMediaItems(matches, sortMode);
-  }, [albumFilter, dayFilter, likedIds, likedOnly, mediaQ.data.albums, mediaQ.data.items, mediaQ.data.places, mineOnly, nameOf, placeFilter, search, sortMode, tagFilter, userId, visibilityFilter]);
+  }, [albumFilter, dayFilter, likedIds, likedOnly, mediaQ.data.albums, mediaQ.data.items, mediaQ.data.places, mineOnly, nameOf, personFilter, placeFilter, search, sortMode, tagFilter, userId, visibilityFilter]);
 
   const viewer = viewerId !== null ? mediaQ.data.items.find((i) => i.id === viewerId) ?? null : null;
 
-  function patchCache(mediaId: string, mutate: (item: MediaItemRow) => MediaItemRow): void {
+  function patchCache(mediaId: string, mutate: (item: WallItem) => WallItem): void {
     queryClient.setQueryData<MediaPayload>(["media", tripId], (old) =>
       old
         ? { ...old, items: old.items.map((i) => (i.id === mediaId ? mutate(i) : i)) }
         : old,
     );
+  }
+
+  async function createUploadAlbum(): Promise<void> {
+    if (upNewAlbumName.trim() === "") return;
+    setUpCreatingAlbum(true);
+    const result = await createAlbumWithVisibility(tripId, upNewAlbumName, upNewAlbumVisibility);
+    setUpCreatingAlbum(false);
+    if (!result.ok) {
+      pushToast({ message: t("media.errors.albumCreate"), type: "danger" });
+      return;
+    }
+    const created: WallAlbum = {
+      id: result.id,
+      name: upNewAlbumName.trim(),
+      description: null,
+      created_by: userId,
+      visibility: upNewAlbumVisibility,
+      owner_id: userId,
+      cover_item_id: null,
+    };
+    queryClient.setQueryData<MediaPayload>(["media", tripId], (old) =>
+      old ? { ...old, albums: [...old.albums, created].sort((a, b) => a.name.localeCompare(b.name, "he")) } : old,
+    );
+    setUpAlbumId(result.id);
+    setUpNewAlbumName("");
+    pushToast({ message: t("media.albumCreated"), type: "success" });
   }
 
   async function uploadOne(file: File, key: string): Promise<void> {
@@ -381,12 +595,26 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         clientItemId: uuid,
         title: file.name.replace(/\.[^.]+$/, "").trim().slice(0, 120) || null,
         originalFilename: file.name.trim().slice(0, 180) || null,
-        albumId: null,
-        linkedPlaceId: null,
-        taggedMemberIds: [],
+        albumId: upAlbumId || null,
+        linkedPlaceId: upPlaceId || null,
+        taggedMemberIds: upPeople,
         tags: [],
       });
       if (!reg.ok) throw new Error(reg.error);
+
+      // §6 organization columns (migration 0022). Best-effort: the legacy row
+      // above is already valid, so a pre-migration schema only loses the
+      // mirrors. GPS/taken_at stored solely from this user-picked file.
+      if (upPeople.length > 0 || upPlaceId !== "" || upAddress.trim() !== "" || upLat !== null || upLng !== null) {
+        await updateMediaExtendedColumns(reg.id, {
+          people: upPeople,
+          place_id: upPlaceId || null,
+          address_text: upAddress.trim().slice(0, 240) || null,
+          taken_at: new Date().toISOString(),
+          lat: upLat,
+          lng: upLng,
+        });
+      }
 
       setStatus("done");
       void queryClient.invalidateQueries({ queryKey: ["media", tripId] });
@@ -433,7 +661,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
     void Promise.all(Array.from({ length: Math.min(2, list.length) }, () => worker()));
   }
 
-  function toggleLike(item: MediaItemRow): void {
+  function toggleLike(item: WallItem): void {
     const liked = mediaQ.data.reactions.some((r) => r.kind === "like" && r.media_id === item.id && r.member_id === userId);
     const tempId = `temp-${crypto.randomUUID()}`;
     queryClient.setQueryData<MediaPayload>(["media", tripId], (old) =>
@@ -457,7 +685,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
     });
   }
 
-  function sendComment(item: MediaItemRow, body: string): void {
+  function sendComment(item: WallItem, body: string): void {
     if (body.trim() === "") return;
     if (body.length > 280) {
       pushToast({ message: t("media.errors.commentTooLong"), type: "danger" });
@@ -486,7 +714,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
     });
   }
 
-  function togglePrivate(item: MediaItemRow): void {
+  function togglePrivate(item: WallItem): void {
     const next = item.visibility === "private" ? "group" : "private";
     patchCache(item.id, (i) => ({ ...i, visibility: next }));
     void setMediaVisibilityAction(item.id, next).then((result) => {
@@ -521,6 +749,42 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       });
   }
 
+  function renderTile(item: WallViewItem): ReactNode {
+    const full = item as WallItem;
+    return (
+      <button
+        key={full.id}
+        type="button"
+        onClick={() => setViewerId(full.id)}
+        aria-label={full.title ?? full.caption ?? t("media.title")}
+        className="relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border border-border bg-surface-raised text-start active:opacity-80"
+      >
+        <ThumbImage
+          path={full.thumbnail_path ?? full.storage_path}
+          width={full.width}
+          height={full.height}
+          alt={full.title ?? full.caption ?? t("media.title")}
+        />
+        {full.is_moment_of_day && (
+          <span aria-label={t("media.dayLabel", { day: full.day_number ?? 0 })} className="absolute top-1 end-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-warning/90 text-white">
+            <Star aria-hidden size={14} />
+          </span>
+        )}
+        {full.visibility === "private" && (
+          <span aria-label={t("media.privateBadge")} className="absolute top-1 start-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white">
+            <Lock aria-hidden size={13} />
+          </span>
+        )}
+        {((likeCounts.get(full.id) ?? 0) > 0 || (commentCount.get(full.id) ?? 0) > 0) && (
+          <span className="absolute bottom-1 end-1 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white">
+            <Heart aria-hidden size={11} />
+            <span dir="ltr" className="tnum">{likeCounts.get(full.id) ?? 0}</span>
+          </span>
+        )}
+      </button>
+    );
+  }
+
   return (
     <>
       {/* Upload entry + hints */}
@@ -546,6 +810,119 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         <p className="text-xs text-text-muted">
           {t("media.photosOnlyHint")} · {t("media.exifNote")}
         </p>
+        <div className="rounded-xl border border-border bg-surface p-3">
+          <p className="text-sm font-bold text-text-primary">{t("media.uploadDetails")}</p>
+          <p className="mt-0.5 text-xs text-text-muted">{t("media.uploadDetailsHint")}</p>
+          <div className="mt-2 flex flex-col gap-2">
+            <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+              {t("media.albumField")}
+              <select
+                value={upAlbumId}
+                onChange={(event) => setUpAlbumId(event.target.value)}
+                className="min-h-12 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm text-text-primary outline-none focus:border-brand"
+              >
+                <option value="">{t("media.noAlbum")}</option>
+                {mediaQ.data.albums.map((album) => (
+                  <option key={album.id} value={album.id}>
+                    {album.name}
+                    {album.visibility === "private" ? ` (${t("media.visibilityPrivate")})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={upNewAlbumName}
+                onChange={(event) => setUpNewAlbumName(event.target.value)}
+                maxLength={80}
+                placeholder={t("media.newAlbumPlaceholder")}
+                aria-label={t("media.newAlbumPlaceholder")}
+                className="min-h-12 w-full min-w-0 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm text-text-primary outline-none focus:border-brand"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                loading={upCreatingAlbum}
+                disabled={upNewAlbumName.trim() === ""}
+                onClick={() => void createUploadAlbum()}
+                icon={<FolderPlus size={18} />}
+              >
+                {t("media.createAlbum")}
+              </Button>
+            </div>
+            <div className="flex gap-1.5" role="group" aria-label={t("media.albumVisibilityLabel")}>
+              {(["shared", "private"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={upNewAlbumVisibility === mode}
+                  onClick={() => setUpNewAlbumVisibility(mode)}
+                  className={
+                    upNewAlbumVisibility === mode
+                      ? "inline-flex min-h-10 flex-1 items-center justify-center rounded-full bg-brand px-3 text-xs font-bold text-brand-contrast"
+                      : "inline-flex min-h-10 flex-1 items-center justify-center rounded-full border border-border bg-surface-raised px-3 text-xs font-bold text-text-secondary"
+                  }
+                >
+                  {mode === "shared" ? t("media.visibilityShared") : t("media.visibilityPrivate")}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted">
+              {upNewAlbumVisibility === "shared" ? t("media.albumSharedHint") : t("media.albumPrivateHint")}
+            </p>
+            <fieldset className="rounded-xl border border-border p-3">
+              <legend className="px-1 text-sm font-semibold text-text-secondary">{t("media.peopleField")}</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {members.map((member) => (
+                  <label key={member.user_id} className="flex min-h-12 items-center gap-2 rounded-lg bg-surface-raised px-2 text-sm text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={upPeople.includes(member.user_id)}
+                      onChange={(event) =>
+                        setUpPeople((current) =>
+                          event.target.checked
+                            ? [...current, member.user_id]
+                            : current.filter((id) => id !== member.user_id),
+                        )
+                      }
+                    />
+                    <span className="truncate">{member.full_name}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+              {t("media.placeField")}
+              <select
+                value={upPlaceId}
+                onChange={(event) => setUpPlaceId(event.target.value)}
+                className="min-h-12 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm text-text-primary outline-none focus:border-brand"
+              >
+                <option value="">{t("media.noPlace")}</option>
+                {mediaQ.data.places.map((place) => (
+                  <option key={place.id} value={place.id}>{place.name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+              <span>{t("media.addressField")}</span>
+              <AddressAutocomplete
+                value={upAddress}
+                onValueChange={(next) => {
+                  setUpAddress(next);
+                  setUpLat(null);
+                  setUpLng(null);
+                }}
+                onSelect={(selection) => {
+                  setUpAddress(selection.address);
+                  setUpLat(selection.lat);
+                  setUpLng(selection.lng);
+                }}
+              />
+            </div>
+            <p className="text-xs text-text-muted">{t("media.locationNote")}</p>
+          </div>
+        </div>
       </div>
 
       {/* Upload tiles (indeterminate progress per file — simplification) */}
@@ -605,6 +982,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
             className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
           >
             <option value="">{t("media.allAlbums")}</option>
+            <option value="none">{t("media.unknownAlbum")}</option>
             {mediaQ.data.albums.map((album) => <option key={album.id} value={album.id}>{album.name}</option>)}
           </select>
         </label>
@@ -616,6 +994,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
             className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
           >
             <option value="">{t("media.allPlaces")}</option>
+            <option value="none">{t("media.unknownPlace")}</option>
             {mediaQ.data.places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
           </select>
         </label>
@@ -721,7 +1100,9 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         </label>
       </div>
 
-      {/* Grid — masonry via CSS columns */}
+      {/* Views — one source, five panes (docs/14 §6.3) */}
+      <ViewSwitcher view={view} onChange={setView} />
+
       {filtered.length === 0 ? (
         mediaQ.data.items.length === 0 ? (
           <EmptyState illustration="media" title={t("media.empty")} hint={t("media.emptyHint")} />
@@ -733,41 +1114,34 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
             </Button>
           </div>
         )
+      ) : view === "map" ? (
+        <MapPane items={filtered} onOpenItem={(id) => setViewerId(id)} />
+      ) : view === "days" ? (
+        <DaysPane items={filtered} renderTile={renderTile} />
+      ) : view === "albums" ? (
+        <AlbumsPane
+          items={filtered}
+          albums={mediaQ.data.albums}
+          activeAlbumId={albumFilter === "" ? null : albumFilter}
+          onSelectAlbum={(id) => setAlbumFilter(id ?? "")}
+          renderTile={renderTile}
+        />
+      ) : view === "people" ? (
+        <PeoplePane
+          items={filtered}
+          members={members}
+          activePerson={personFilter}
+          onSelectPerson={setPersonFilter}
+          renderTile={renderTile}
+        />
       ) : (
-        <div className="columns-2 gap-2 min-[430px]:columns-3">
-          {filtered.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setViewerId(item.id)}
-              aria-label={item.title ?? item.caption ?? t("media.title")}
-              className="relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border border-border bg-surface-raised text-start active:opacity-80"
-            >
-              <ThumbImage
-                path={item.thumbnail_path ?? item.storage_path}
-                width={item.width}
-                height={item.height}
-                alt={item.title ?? item.caption ?? t("media.title")}
-              />
-              {item.is_moment_of_day && (
-                <span aria-label={t("media.dayLabel", { day: item.day_number ?? 0 })} className="absolute top-1 end-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-warning/90 text-white">
-                  <Star aria-hidden size={14} />
-                </span>
-              )}
-              {item.visibility === "private" && (
-                <span aria-label={t("media.privateBadge")} className="absolute top-1 start-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white">
-                  <Lock aria-hidden size={13} />
-                </span>
-              )}
-              {((likeCounts.get(item.id) ?? 0) > 0 || (commentCount.get(item.id) ?? 0) > 0) && (
-                <span className="absolute bottom-1 end-1 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-bold text-white">
-                  <Heart aria-hidden size={11} />
-                  <span dir="ltr" className="tnum">{likeCounts.get(item.id) ?? 0}</span>
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <PlacesPane
+          items={filtered}
+          places={mediaQ.data.places}
+          activePlace={placeFilter}
+          onSelectPlace={setPlaceFilter}
+          renderTile={renderTile}
+        />
       )}
 
       {/* Viewer */}
@@ -796,11 +1170,12 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
                 {viewer.visibility === "private" && ` · ${t("media.privateBadge")}`}
               </span>
               {viewer.caption && <p className="text-sm text-text-secondary">{viewer.caption}</p>}
-              {(viewer.album_id || viewer.linked_place_id || viewer.tags.length > 0 || viewer.tagged_member_ids.length > 0) && (
+              {(viewer.album_id || placeOf(viewer) || viewer.address_text || viewer.tags.length > 0 || peopleOf(viewer).length > 0) && (
                 <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-text-muted">
                   {viewer.album_id && <span className="rounded-full bg-brand-soft px-2 py-1">{mediaQ.data.albums.find((album) => album.id === viewer.album_id)?.name}</span>}
-                  {viewer.linked_place_id && <span className="rounded-full bg-brand-soft px-2 py-1">{mediaQ.data.places.find((place) => place.id === viewer.linked_place_id)?.name}</span>}
-                  {viewer.tagged_member_ids.map((id) => <span key={id} className="rounded-full bg-surface px-2 py-1">{nameOf.get(id)}</span>)}
+                  {placeOf(viewer) && <span className="rounded-full bg-brand-soft px-2 py-1">{mediaQ.data.places.find((place) => place.id === placeOf(viewer))?.name}</span>}
+                  {viewer.address_text && <span dir="auto" className="rounded-full bg-brand-soft px-2 py-1">{viewer.address_text}</span>}
+                  {peopleOf(viewer).map((id) => <span key={id} className="rounded-full bg-surface px-2 py-1">{nameOf.get(id)}</span>)}
                   {viewer.tags.map((tag) => <span key={tag} className="rounded-full bg-surface px-2 py-1">#{tag}</span>)}
                 </div>
               )}
@@ -873,6 +1248,8 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         albums={mediaQ.data.albums}
         places={mediaQ.data.places}
         members={members}
+        tripId={tripId}
+        userId={userId}
         onClose={() => setEditTarget(null)}
         onSaved={(updated) => {
           patchCache(updated.id, () => updated);
@@ -903,39 +1280,58 @@ function MediaEditSheet({
   albums,
   places,
   members,
+  tripId,
+  userId,
   onClose,
   onSaved,
   onAlbumCreated,
 }: {
-  item: MediaItemRow | null;
-  albums: MediaAlbumRow[];
+  item: WallItem | null;
+  albums: WallAlbum[];
   places: MediaPlaceRow[];
   members: TripMember[];
+  tripId: string;
+  userId: string;
   onClose: () => void;
-  onSaved: (item: MediaItemRow) => void;
-  onAlbumCreated: (album: MediaAlbumRow) => void;
+  onSaved: (item: WallItem) => void;
+  onAlbumCreated: (album: WallAlbum) => void;
 }) {
   const [title, setTitle] = useState(item?.title ?? "");
   const [caption, setCaption] = useState(item?.caption ?? "");
   const [day, setDay] = useState(item?.day_number?.toString() ?? "");
   const [albumId, setAlbumId] = useState(item?.album_id ?? "");
-  const [placeId, setPlaceId] = useState(item?.linked_place_id ?? "");
-  const [tagged, setTagged] = useState<string[]>(item?.tagged_member_ids ?? []);
+  const [placeId, setPlaceId] = useState(item?.place_id ?? item?.linked_place_id ?? "");
+  const [tagged, setTagged] = useState<string[]>(() =>
+    item ? Array.from(new Set([...item.people, ...item.tagged_member_ids])) : [],
+  );
   const [tags, setTags] = useState(item?.tags.join(", ") ?? "");
   const [newAlbum, setNewAlbum] = useState("");
+  const [albumVisibility, setAlbumVisibility] = useState<"shared" | "private">("shared");
+  const [addressText, setAddressText] = useState(item?.address_text ?? "");
+  const [addrLat, setAddrLat] = useState<number | null>(item?.lat ?? null);
+  const [addrLng, setAddrLng] = useState<number | null>(item?.lng ?? null);
+  const [takenAt, setTakenAt] = useState(item?.taken_at ? item.taken_at.slice(0, 16) : "");
   const [saving, setSaving] = useState(false);
   const [creatingAlbum, setCreatingAlbum] = useState(false);
 
   async function createAlbum(): Promise<void> {
     if (!item || newAlbum.trim() === "") return;
     setCreatingAlbum(true);
-    const result = await createMediaAlbumAction(newAlbum);
+    const result = await createAlbumWithVisibility(tripId, newAlbum, albumVisibility);
     setCreatingAlbum(false);
     if (!result.ok) {
       pushToast({ message: t("media.errors.albumCreate"), type: "danger" });
       return;
     }
-    const album = { id: result.id, name: newAlbum.trim(), description: null, created_by: item.uploader_id };
+    const album: WallAlbum = {
+      id: result.id,
+      name: newAlbum.trim(),
+      description: null,
+      created_by: item.uploader_id,
+      visibility: albumVisibility,
+      owner_id: userId,
+      cover_item_id: null,
+    };
     onAlbumCreated(album);
     setAlbumId(result.id);
     setNewAlbum("");
@@ -945,6 +1341,16 @@ function MediaEditSheet({
   async function save(): Promise<void> {
     if (!item) return;
     const normalizedTags = [...new Set(tags.split(/[,#]/).map((tag) => tag.trim()).filter(Boolean))].slice(0, 20);
+    const cleanAddress = addressText.trim().slice(0, 240) || null;
+    let cleanTakenAt: string | null = null;
+    if (takenAt !== "") {
+      const parsed = Date.parse(takenAt);
+      if (Number.isNaN(parsed)) {
+        pushToast({ message: t("media.errors.metadataSave"), type: "danger" });
+        return;
+      }
+      cleanTakenAt = new Date(parsed).toISOString();
+    }
     setSaving(true);
     const result = await updateMediaMetadataAction({
       mediaId: item.id,
@@ -956,11 +1362,22 @@ function MediaEditSheet({
       taggedMemberIds: tagged,
       tags: normalizedTags,
     });
-    setSaving(false);
     if (!result.ok) {
+      setSaving(false);
       pushToast({ message: t("media.errors.metadataSave"), type: "danger" });
       return;
     }
+    // §6 mirrors: the same people/place land on the new columns (best-effort;
+    // the legacy row above is already valid on a pre-migration schema).
+    await updateMediaExtendedColumns(item.id, {
+      people: tagged,
+      place_id: placeId || null,
+      address_text: cleanAddress,
+      taken_at: cleanTakenAt,
+      lat: addrLat,
+      lng: addrLng,
+    });
+    setSaving(false);
     onSaved({
       ...item,
       title: title.trim() || null,
@@ -970,6 +1387,12 @@ function MediaEditSheet({
       linked_place_id: placeId || null,
       tagged_member_ids: tagged,
       tags: normalizedTags.map((tag) => tag.toLocaleLowerCase("he-IL")),
+      people: tagged,
+      place_id: placeId || null,
+      address_text: cleanAddress,
+      taken_at: cleanTakenAt,
+      lat: addrLat,
+      lng: addrLng,
     });
     pushToast({ message: t("media.metadataSaved"), type: "success" });
   }
@@ -1030,6 +1453,26 @@ function MediaEditSheet({
               {t("media.createAlbum")}
             </Button>
           </div>
+          <div className="flex gap-1.5" role="group" aria-label={t("media.albumVisibilityLabel")}>
+            {(["shared", "private"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={albumVisibility === mode}
+                onClick={() => setAlbumVisibility(mode)}
+                className={
+                  albumVisibility === mode
+                    ? "inline-flex min-h-10 flex-1 items-center justify-center rounded-full bg-brand px-3 text-xs font-bold text-brand-contrast"
+                    : "inline-flex min-h-10 flex-1 items-center justify-center rounded-full border border-border bg-surface px-3 text-xs font-bold text-text-secondary"
+                }
+              >
+                {mode === "shared" ? t("media.visibilityShared") : t("media.visibilityPrivate")}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-text-muted">
+            {albumVisibility === "shared" ? t("media.albumSharedHint") : t("media.albumPrivateHint")}
+          </p>
           <fieldset className="rounded-xl border border-border p-3">
             <legend className="px-1 text-sm font-semibold text-text-secondary">{t("media.peopleField")}</legend>
             <div className="grid grid-cols-2 gap-2">
@@ -1049,6 +1492,33 @@ function MediaEditSheet({
             {t("media.tagsField")}
             <input value={tags} onChange={(event) => setTags(event.target.value)} maxLength={660} placeholder={t("media.tagsPlaceholder")} className={fieldClass} />
           </label>
+          <div className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+            <span>{t("media.addressField")}</span>
+            <AddressAutocomplete
+              value={addressText}
+              onValueChange={(next) => {
+                setAddressText(next);
+                setAddrLat(null);
+                setAddrLng(null);
+              }}
+              onSelect={(selection) => {
+                setAddressText(selection.address);
+                setAddrLat(selection.lat);
+                setAddrLng(selection.lng);
+              }}
+            />
+          </div>
+          <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+            {t("media.takenAtLabel")}
+            <input
+              type="datetime-local"
+              value={takenAt}
+              onChange={(event) => setTakenAt(event.target.value)}
+              className={fieldClass}
+              dir="ltr"
+            />
+          </label>
+          <p className="text-xs text-text-muted">{t("media.locationNote")}</p>
           <Button type="submit" block loading={saving}>{t("common.save")}</Button>
         </form>
       )}

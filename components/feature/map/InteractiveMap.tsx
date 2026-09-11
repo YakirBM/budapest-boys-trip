@@ -57,6 +57,14 @@ function clusterElement(count: number, label: string): HTMLButtonElement {
   return element;
 }
 
+export interface MapPinMarker {
+  id: string;
+  lat: number;
+  lng: number;
+  label: string;
+  kind: string;
+}
+
 export interface InteractiveMapProps {
   places: MapPlace[];
   anchors: AnchorStation[];
@@ -69,6 +77,13 @@ export interface InteractiveMapProps {
   onSelectPlace: (id: string) => void;
   /** Fired once tile loading fails so the parent can show a visible banner. */
   onTileError?: () => void;
+  /** Shared pins overlay (docs/14 §3.3.3) — optional so /map keeps working. */
+  pins?: MapPinMarker[];
+  showPins?: boolean;
+  selectedPinId?: string | null;
+  onSelectPin?: (id: string) => void;
+  /** Empty-map tap (long-press on touch) → parent opens PinSheet. */
+  onMapClick?: (point: GeoPoint) => void;
 }
 
 export default function InteractiveMap({
@@ -82,6 +97,11 @@ export default function InteractiveMap({
   clusterAriaLabel,
   onSelectPlace,
   onTileError,
+  pins = [],
+  showPins = false,
+  selectedPinId = null,
+  onSelectPin,
+  onMapClick,
 }: InteractiveMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -183,19 +203,49 @@ export default function InteractiveMap({
         bounds.extend([anchor.lng, anchor.lat]);
       }
     }
+    if (showPins) {
+      for (const pin of pins) {
+        const element = markerElement(pin.label, "place", null);
+        element.dataset.selected = String(pin.id === selectedPinId);
+        element.style.background = "var(--color-brand)";
+        const pinId = pin.id;
+        element.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onSelectPin?.(pinId);
+        });
+        markers.push(new Marker({ element, anchor: "center" }).setLngLat([pin.lng, pin.lat]).addTo(map));
+        bounds.extend([pin.lng, pin.lat]);
+      }
+    }
     markersRef.current = markers;
     // Auto-fit only when the underlying dataset changes — never fight the
     // user's own zoom (which also drives low-zoom clustering).
     const fitSignature = JSON.stringify([
       showPlaces ? places.map((p) => p.id) : [],
       showAnchors ? anchors.map((a) => a.id) : [],
+      showPins ? pins.map((p) => p.id) : [],
       selectedPlaceId,
+      selectedPinId,
     ]);
     if (!bounds.isEmpty() && fittedRef.current !== fitSignature) {
       fittedRef.current = fitSignature;
       map.fitBounds(bounds, { padding: 48, maxZoom: 14, duration: 500 });
     }
-  }, [anchors, clusterAriaLabel, onSelectPlace, places, selectedPlaceId, showAnchors, showPlaces, zoom]);
+  }, [anchors, clusterAriaLabel, onSelectPin, onSelectPlace, pins, places, selectedPinId, selectedPlaceId, showAnchors, showPins, showPlaces, zoom]);
+
+  // Empty-map tap → pin draft (long-press on touch also fires click on release).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !onMapClick) return;
+    const handler = (event: { lngLat: { lat: number; lng: number } }) => {
+      onMapClick({ lat: event.lngLat.lat, lng: event.lngLat.lng });
+    };
+    const attached = map.on("click", handler as never);
+    void attached;
+    return () => {
+      map.off("click", handler as never);
+    };
+  }, [onMapClick]);
 
   useEffect(() => {
     const map = mapRef.current;

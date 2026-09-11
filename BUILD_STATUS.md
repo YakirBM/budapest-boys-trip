@@ -10,6 +10,13 @@
 - **Database**: 16 migrations applied to `zgvpchdqudheiohlrrvm` (empty→seeded, non-destructive). Seed verification: **11/11 expected counts OK**. Both private buckets verified `public=false`.
 - **DEPLOYED (2026-09-11)**: https://medbadboys.vercel.app (prod alias; project yakirbm2026/budapest_boys_trip_sep2026). All post-deploy verifications green — see T-003.
 
+## Checkpoint (2026-09-11, docs/14 header + 4-tab redesign — built, DB push pending)
+
+- **Spec**: `docs/14-header-and-navigation-redesign.md` (approved-spec). Decisions locked: parallel tracks, personal schedule = separate table, scrape = server OG+extended, map pins = shared synced.
+- **Built**: Phase 0 primitives (`AmountInput`, `SubTabs`, `GroupPersonalToggle`, tile scrims, `@dnd-kit/*`); Phase 1 shell (`AppHeader` live HU/IL flag clocks + weather + theme + emergency + `ProfileMenu` full edit/logout, 4-tab `BottomNav`, `0023_profile_extended.sql` + `avatars` bucket + `updateMyProfileAction`); Tab 1 schedule tiles/drawer/comments + places grid/form + `/api/scrape` + shared `map_pins` (`0018/0019/0020`); Tab 2 checklist groups (`0021`); Tab 3 money wording/converter/reports; Tab 4 media albums/views + `/api/geocode` (`0022`).
+- **Evidence**: `pnpm typecheck` 0 errors, `pnpm lint` 0 problems, `pnpm test` 120/120 (16 files), `pnpm test:e2e` 12/12, `pnpm build` green (16 routes). Hebrew-literal scan clean in new TSX; banned-word scan clean in money components.
+- **Pending (needs secrets/network or human)**: `pnpm db:push` for migrations 0018–0023; full `supabase/rls-tests.sql` run (B3, needs direct SQL); `scripts/visual-audit.mjs` RTL/theme screenshots; real-device UAT + magic-link test (B2).
+
 ## T-001 — Supabase publishable key 401: **RESOLVED (2026-09-11)**
 
 - **Evidence before fix**: `curl /rest/v1/` with key → 401; body: `{"hint":"Only secret API keys can be used for this endpoint.","message":"Secret API key required"}`

@@ -297,6 +297,14 @@
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* Hide scrollbars on horizontal chip rows while keeping scroll. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Page content bottom padding: 64px nav + breathing room + safe area. */
 @utility pb-nav-safe {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
@@ -376,6 +384,29 @@
 /* TimeBlock "now" state — brand border pulse. */
 @utility pulse-brand {
   animation: brand-pulse 1.6s ease-in-out infinite;
+}
+
+/* Schedule tile scrims — cover image + blur content plate (docs/14 §3.2.2).
+   The plate guarantees AA text on any photo; the frame color comes from the
+   --color-cat-* token via border-s-* classes in the component. */
+@utility tile-cover {
+  background-size: cover;
+  background-position: center;
+}
+
+@utility tile-plate {
+  background-color: color-mix(in srgb, var(--c-surface) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@utility tile-scrim-dark {
+  background-image: linear-gradient(
+    to top,
+    rgb(0 0 0 / 72%) 0%,
+    rgb(0 0 0 / 38%) 55%,
+    rgb(0 0 0 / 8%) 100%
+  );
 }
 
 /* ============================================================================

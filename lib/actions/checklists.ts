@@ -120,3 +120,48 @@ export async function validateToggleAction(input: {
   );
   return unresolved ? { ok: false, error: ERR.blocked } : { ok: true };
 }
+
+/**
+ * Persist a drag-and-drop reorder (docs/14 §4.2).
+ * Sets both `position` (0021) and the legacy `sort_order` to the same value
+ * so pre-migration ORDER BY sort_order queries keep working. RLS applies via
+ * the caller's session (checklist_items_update through the parent checklist).
+ */
+export async function reorderChecklistItemsAction(input: {
+  items: { id: string; position: number }[];
+}): Promise<ActionResult> {
+  const parsed = z
+    .object({
+      items: z
+        .array(
+          z.object({
+            id: z.string().min(8).max(64),
+            position: z.number().int().min(0).max(1_000_000),
+          }),
+        )
+        .min(1)
+        .max(200),
+    })
+    .safeParse(input);
+  if (!parsed.success) return { ok: false, error: ERR.invalid };
+
+  const supabase = await getSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: ERR.forbidden };
+
+  for (const row of parsed.data.items) {
+    const { error } = await supabase
+      .from("checklist_items")
+      .update({ position: row.position, sort_order: row.position })
+      .eq("id", row.id);
+    if (error) {
+      console.error("reorderChecklistItems failed", error.message);
+      return { ok: false, error: ERR.generic };
+    }
+  }
+
+  revalidatePath("/checklists");
+  return { ok: true };
+}

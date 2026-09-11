@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
@@ -12,17 +12,29 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { EstimateBadge } from "@/components/ui/EstimateBadge";
 import { QuickActionBar } from "@/components/ui/QuickActionBar";
 import { DirectionalIcon } from "@/components/ui/DirectionalIcon";
+import { MemberAvatar } from "@/components/ui/MemberAvatar";
 import { pushToast } from "@/components/ui/Toast";
 import { deleteExpenseAction, settleTripAction } from "@/lib/actions/money";
 import { enqueue } from "@/lib/offline/db";
 import { useOutboxSync } from "@/lib/offline/useOutboxSync";
 import { TZ_BUDAPEST, formatInTz } from "@/lib/utils/time";
-import { CURRENCIES, isCurrency } from "@/lib/utils/money";
+import { isCurrency } from "@/lib/utils/money";
+import { CURRENCIES } from "@/lib/utils/money";
 import { ExpenseForm } from "./ExpenseForm";
 import { ConverterSheet } from "./ConverterSheet";
+import { Reports } from "./Reports";
 import { ExpenseStatusChip, ExpenseCategoryIcon, expenseCategoryLabel } from "./visuals";
 import { reconcileExpenseSplits } from "./offlineReconcile";
 import { fetchBalancesPayload, fetchExpensesPayload } from "./clientBoard";
+import {
+  buildBalanceBreakdownList,
+  buildBalanceText,
+  buildExpensePaidLine,
+  buildExpenseSplitLine,
+  buildTransferParticipants,
+  buildTransferReason,
+  splitTemplate,
+} from "./wording";
 import type { ExpenseRow } from "@/lib/data/money";
 import type { TripMember } from "@/lib/data/trip";
 
@@ -45,11 +57,35 @@ export interface MoneyViewProps {
 const timeFormatter = (iso: string): string =>
   formatInTz(new Date(iso), TZ_BUDAPEST, { hour: "2-digit", minute: "2-digit" });
 
+/** Render a translated template, injecting LTR-isolated nodes for amounts. */
+function renderTemplate(
+  template: string,
+  values: Record<string, ReactNode>,
+  ltrKeys: ReadonlySet<string> = new Set(["amount", "rate", "result"]),
+): ReactNode {
+  const parts = splitTemplate(template);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.type === "text") return <span key={i}>{part.value}</span>;
+        const node = values[part.key];
+        if (ltrKeys.has(part.key)) {
+          return (
+            <span key={i} dir="ltr" className="tnum ltr-iso whitespace-nowrap">
+              {node}
+            </span>
+          );
+        }
+        return <span key={i}>{node}</span>;
+      })}
+    </>
+  );
+}
+
 /**
- * Money screen (docs/06-features/05-finance.md): stats, live FX caption,
- * balances, minimal-transfer settlement, day-grouped expense feed, FAB entry
- * and the FX converter. Offline: reads come from IndexedDB snapshots, entries
- * queue through the outbox, splits re-attach on reconnect.
+ * Money screen (docs/14 §5): full-sentence balances/transfers/expenses with
+ * 28px round avatars, live converter, CSS-only reports, counterpart names.
+ * Offline: IndexedDB snapshots + outbox + split re-attach on reconnect.
  */
 export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDay }: MoneyViewProps) {
   const queryClient = useQueryClient();
@@ -137,6 +173,18 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
   const splitsOf = (expenseId: string) => expensesQ.data.splits.filter((s) => s.expense_id === expenseId);
   const ilsRate = expensesQ.data.rates.find((r) => r.base === "HUF" && r.quote === "ILS");
 
+  /** Attribute a settlement transfer to its most recent shared expense. */
+  function attributeTransfer(fromUser: string, toUser: string): { title: string; count: number } | null {
+    for (const e of expensesQ.data.expenses) {
+      if (e.is_personal || e.paid_by !== toUser) continue;
+      const parts = splitsOf(e.id).map((s) => s.member_id);
+      const involves = parts.length > 0 ? parts.includes(fromUser) : true;
+      if (!involves) continue;
+      return { title: e.title, count: parts.length > 0 ? parts.length : 2 };
+    }
+    return null;
+  }
+
   function onOfflineTemp(expense: ExpenseRow): void {
     queryClient.setQueryData< Awaited<ReturnType<typeof fetchExpensesPayload>> >(
       ["expenses", tripId],
@@ -220,7 +268,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
           <button
             type="button"
             onClick={refresh}
-            className="inline-flex min-h-10 items-center rounded-lg px-2 text-xs font-bold text-danger"
+            className="inline-flex min-h-12 items-center rounded-lg px-2 text-xs font-bold text-danger"
           >
             {t("common.retry")}
           </button>
@@ -281,9 +329,9 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
         />
       </div>
 
-      {/* Balances */}
+      {/* Balances — full sentences with avatars (docs/14 §5.1) */}
       <Card className="mb-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-text-primary">{t("money.balancesTitle")}</h2>
           {isOwner && (
             <button
@@ -299,21 +347,51 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
         <ul className="flex flex-col gap-1.5">
           {balances.map((b) => {
             const net = Math.round(b.net_base_huf);
-            const label =
-              net > 0 ? t("money.owed") : net < 0 ? t("money.owes") : t("money.even");
+            const name = nameOf.get(b.user_id) ?? "—";
+            const amountFormatted = formatMoney(Math.abs(net), "HUF");
+            const debts = transfers
+              .filter((s) => s.from_user === b.user_id)
+              .map((s) => ({
+                name: nameOf.get(s.to_user) ?? "—",
+                amountFormatted: formatMoney(s.amount_base_huf, "HUF"),
+              }));
+            const breakdownList = debts.length > 0 ? buildBalanceBreakdownList(debts) : undefined;
+            const sentence = buildBalanceText({ netHuf: net, name, amountFormatted, breakdownList });
+            const template =
+              net > 0
+                ? t("money.balances.owedTo")
+                : net < 0
+                  ? breakdownList
+                    ? t("money.balances.breakdownWrap")
+                    : t("money.balances.owesDetail")
+                  : t("money.balances.settledClean");
             return (
-              <li key={b.user_id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-lg bg-surface-raised px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_auto_auto]">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary" title={nameOf.get(b.user_id) ?? "—"}>
-                  {nameOf.get(b.user_id) ?? "—"}
+              <li
+                key={b.user_id}
+                className="flex items-center gap-2.5 rounded-lg bg-surface-raised px-3 py-2"
+              >
+                <MemberAvatar name={name} size={28 as 32} />
+                <span className="min-w-0 flex-1 text-sm leading-6 text-text-primary" aria-label={sentence}>
+                  {net > 0 &&
+                    renderTemplate(template, { name, amount: amountFormatted })}
+                  {net < 0 &&
+                    (breakdownList
+                      ? renderTemplate(template, {
+                          base: renderTemplate(t("money.balances.owesDetail"), {
+                            name,
+                            amount: amountFormatted,
+                          }),
+                          list: breakdownList,
+                        })
+                      : renderTemplate(template, { name, amount: amountFormatted }))}
+                  {net === 0 && <span>{sentence}</span>}
                 </span>
                 <span
-                  className={`${netToneClass(net)} justify-self-end`}
-                  aria-label={`${label}: ${formatMoney(Math.abs(net), "HUF")}`}
+                  aria-hidden
+                  dir="ltr"
+                  className={`tnum shrink-0 whitespace-nowrap text-sm font-bold ${net > 0 ? "text-success" : net < 0 ? "text-danger" : "text-text-muted"}`}
                 >
-                  {label}
-                </span>
-                <span dir="ltr" className="tnum col-span-2 justify-self-end whitespace-nowrap text-sm font-bold text-text-primary min-[380px]:col-span-1">
-                  {formatMoney(Math.abs(net), "HUF")}
+                  {net === 0 ? "" : amountFormatted}
                 </span>
               </li>
             );
@@ -321,7 +399,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
         </ul>
       </Card>
 
-      {/* Settlement plan */}
+      {/* Settlement plan — payer + counterparties + reason */}
       <Card className="mb-4">
         <h2 className="text-base font-semibold text-text-primary">{t("money.settlementTitle")}</h2>
         <p className="mb-2 text-xs text-text-muted">{t("money.settlementHint")}</p>
@@ -337,17 +415,35 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
               const paid = paidTransfers.has(key);
               const fromName = nameOf.get(transfer.from_user) ?? "—";
               const toName = nameOf.get(transfer.to_user) ?? "—";
+              const amountFormatted = formatMoney(transfer.amount_base_huf, "HUF");
+              const attributed = attributeTransfer(transfer.from_user, transfer.to_user);
+              const reason = buildTransferReason(attributed?.title ?? null);
+              const participantCount = attributed?.count ?? members.length;
+              const participantsLine = buildTransferParticipants(participantCount);
+              const aria = `${fromName} → ${toName} · ${amountFormatted} · ${reason} · ${participantsLine}`;
               return (
                 <li
                   key={key}
-                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_auto_auto]"
+                  className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm text-text-primary" title={`${fromName} → ${toName}`}>
+                  <span className="flex shrink-0 items-center">
+                    <MemberAvatar name={fromName} size={28 as 32} />
+                    <DirectionalIcon icon={ArrowRight} size={14} className="mx-1 text-text-muted" />
+                    <MemberAvatar name={toName} size={28 as 32} />
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm leading-6 text-text-primary" aria-label={aria}>
                     <span className="font-semibold">{fromName}</span>
                     <DirectionalIcon icon={ArrowRight} size={14} className="mx-1 inline text-text-muted" />
                     <span className="font-semibold">{toName}</span>
+                    {" · "}
+                    <span dir="ltr" className="tnum ltr-iso whitespace-nowrap font-bold">
+                      {amountFormatted}
+                    </span>
+                    {" · "}
+                    <span className="text-text-secondary">{reason}</span>
+                    {" · "}
+                    <span className="text-xs text-text-muted">{participantsLine}</span>
                   </span>
-                  <MoneyAmount amount={transfer.amount_base_huf} currency="HUF" size="sm" />
                   <button
                     type="button"
                     disabled={paid}
@@ -355,11 +451,11 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                     onClick={() => markTransferPaid(key)}
                     className={
                       paid
-                        ? "col-span-2 inline-flex min-h-10 items-center justify-center rounded-lg bg-success/12 px-2 text-xs font-bold text-success min-[380px]:col-span-1"
-                        : "col-span-2 inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-2 text-xs font-bold text-text-secondary transition-opacity active:opacity-80 min-[380px]:col-span-1"
+                        ? "inline-flex min-h-12 shrink-0 items-center justify-center rounded-lg bg-success/12 px-3 text-xs font-bold text-success"
+                        : "inline-flex min-h-12 shrink-0 items-center justify-center rounded-lg border border-border px-3 text-xs font-bold text-text-secondary transition-opacity active:opacity-80"
                     }
                   >
-                    {paid ? "✓" : t("money.markTransferPaid")}
+                    {paid ? t("money.transfer.paidDone") : t("money.markTransferPaid")}
                   </button>
                 </li>
               );
@@ -368,7 +464,10 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
         )}
       </Card>
 
-      {/* Expense feed */}
+      {/* Reports — CSS-only donut + bars + per-member (docs/14 §5.4) */}
+      <Reports expenses={expensesQ.data.expenses} members={members} nameOf={nameOf} />
+
+      {/* Expense feed — payer + counterpart names + reason + day/time */}
       <section aria-label={t("money.recentTitle")}>
         <h2 className="mb-2 text-base font-semibold text-text-primary">{t("money.recentTitle")}</h2>
         {expensesQ.data.expenses.length === 0 ? (
@@ -388,7 +487,18 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                   {list.map((e) => {
                     const cur: string = isCurrency(e.currency) ? e.currency : "HUF";
                     const base = e.amount_base_huf ?? e.amount;
-                    const participantCount = splitsOf(e.id).length;
+                    const splitIds = splitsOf(e.id).map((s) => s.member_id);
+                    const payerName = nameOf.get(e.paid_by) ?? "—";
+                    const participantNames =
+                      splitIds.length > 0
+                        ? splitIds.map((id) => nameOf.get(id) ?? "—")
+                        : [payerName];
+                    const participantCount = participantNames.length;
+                    const paidAmount = formatMoney(e.amount, cur as (typeof CURRENCIES)[number]);
+                    const paidLine = buildExpensePaidLine(payerName, paidAmount);
+                    const splitLine = buildExpenseSplitLine(participantNames, participantCount);
+                    const time = timeFormatter(e.spent_at);
+                    const aria = `${e.title} · ${paidLine} · ${splitLine}`;
                     return (
                       <li
                         key={e.id}
@@ -397,17 +507,38 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                         <ExpenseCategoryIcon category={e.category} size={36} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-text-primary" title={e.title}>{e.title}</p>
-                          <p className="truncate text-xs text-text-muted">
-                            {nameOf.get(e.paid_by) ?? "—"} · {timeFormatter(e.spent_at)} ·{" "}
-                            {expenseCategoryLabel(e.category)}
-                            {!e.is_personal && participantCount > 0 && (
+                          <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-text-muted" aria-label={aria}>
+                            <MemberAvatar name={payerName} size={28 as 32} />
+                            <span className="min-w-0">
+                              {renderTemplate(t("money.expense.paidLine"), {
+                                name: payerName,
+                                amount: paidAmount,
+                              })}
+                            </span>
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-text-muted">
+                            {renderTemplate(
+                              participantCount <= 1 ? t("money.expense.splitSingle") : t("money.expense.splitAmong"),
+                              participantCount <= 1
+                                ? { names: participantNames.join(", ") }
+                                : { names: participantNames.join(", "), count: participantCount },
+                              new Set(["count"]),
+                            )}
+                            {" · "}
+                            {e.day_number !== null ? (
                               <>
-                                {" · "}
-                                {participantCount === 1
-                                  ? t("money.participantsLineOne")
-                                  : t("money.participantsLine", { count: participantCount })}
+                                {t("money.dayGroup", { day: e.day_number })} ·{" "}
+                                <span dir="ltr" className="tnum ltr-iso">{time}</span>{" "}
+                                <span dir="ltr" className="tnum">HU</span>
+                              </>
+                            ) : (
+                              <>
+                                <span dir="ltr" className="tnum ltr-iso">{time}</span>{" "}
+                                <span dir="ltr" className="tnum">HU</span>
                               </>
                             )}
+                            {" · "}
+                            {expenseCategoryLabel(e.category)}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-1">
                             <ExpenseStatusChip status={e.status} />
@@ -432,7 +563,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                               type="button"
                               aria-label={`${t("common.delete")}: ${e.title}`}
                               onClick={() => setDeleteTarget(e)}
-                              className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-text-muted transition-colors active:text-danger"
+                              className="inline-flex h-12 w-12 items-center justify-center rounded-lg text-text-muted transition-colors active:text-danger"
                             >
                               <Trash2 aria-hidden size={18} />
                             </button>
@@ -466,6 +597,8 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
         open={converterOpen}
         onClose={() => setConverterOpen(false)}
         rates={expensesQ.data.rates}
+        onRefresh={refresh}
+        stale={stale}
       />
 
       <ConfirmSheet
@@ -490,11 +623,4 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
       />
     </>
   );
-}
-
-/** Semantic text color for a net balance without any physical direction class. */
-function netToneClass(net: number): string {
-  if (net > 0) return "shrink-0 text-xs font-bold text-success";
-  if (net < 0) return "shrink-0 text-xs font-bold text-danger";
-  return "shrink-0 text-xs font-bold text-text-muted";
 }

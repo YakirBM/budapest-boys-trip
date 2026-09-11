@@ -83,6 +83,85 @@
       "noteFailed": "שליחת העדכון נכשלה",
       "statusFailed": "עדכון הסטטוס נכשל",
       "queuedOffline": "אין חיבור — העדכון יישלח כשנחזור לרשת"
+    },
+    "sub": {
+      "label": "תצוגות היום שלנו",
+      "schedule": "הלו״ז שלנו",
+      "discover": "מה עושים",
+      "map": "מפה"
+    },
+    "schedule": {
+      "group": "קבוצתי",
+      "personal": "אישי",
+      "scopeLabel": "היקף הלו״ז",
+      "emptyGroupTitle": "אין פריטים קבוצתיים ליום הזה",
+      "emptyGroupHint": "הוסיפו פריט או גלו מקומות בלשונית מה עושים.",
+      "emptyPersonalTitle": "אין פריטים אישיים ליום הזה",
+      "emptyPersonalHint": "הלו״ז האישי נראה רק לך.",
+      "addItem": "הוסף פריט",
+      "allTimesHungary": "כל השעות שעון הונגריה"
+    },
+    "tile": {
+      "navigate": "נווט",
+      "openDetails": "פתח פרטים",
+      "comments": "תגובות",
+      "addComment": "הוסף תגובה",
+      "commentPlaceholder": "כתבו תגובה קצרה…",
+      "commentSent": "התגובה נשלחה",
+      "commentQueued": "אין חיבור — התגובה תישלח כשנחזור לרשת",
+      "noAddress": "בלי כתובת",
+      "ownerLabel": "אחראי",
+      "coverAlt": "תמונת הפריט"
+    },
+    "editor": {
+      "title": "עריכת פריט",
+      "newTitle": "פריט חדש",
+      "fieldTitle": "כותרת",
+      "fieldDescription": "תיאור מפורט",
+      "fieldAddress": "כתובת",
+      "fieldLinks": "קישורים חשובים",
+      "addLink": "הוסף קישור",
+      "removeLink": "הסר קישור",
+      "fieldCosts": "עלויות",
+      "addCost": "הוסף עלות",
+      "removeCost": "הסר עלות",
+      "costLabel": "תיאור העלות",
+      "fieldParticipants": "משתתפים",
+      "fieldResponsibility": "אחריות",
+      "fieldDay": "יום",
+      "fieldStartTime": "שעת התחלה",
+      "fieldDuration": "משך בדקות",
+      "fieldCategory": "קטגוריה",
+      "fieldCover": "תמונת כיסוי",
+      "fetchImage": "משוך תמונה מהקישור",
+      "useImage": "השתמש בתמונה",
+      "removeImage": "הסר תמונה",
+      "imageFromLink": "תמונה מהקישור",
+      "fetchFailed": "לא נמצאה תמונה בקישור",
+      "fieldStatus": "סטטוס",
+      "anchorWarning": "יום 5: המראה 10:25 — לא לשבץ פעילות אחרי 06:00. השמירה אפשרית באישור מנהל.",
+      "deleteItem": "מחק פריט",
+      "deleteConfirm": "למחוק את הפריט? אי אפשר לבטל.",
+      "saved": "הפריט נשמר",
+      "saveFailed": "השמירה נכשלה",
+      "queuedOffline": "אין חיבור — יישמר ויסונכרן בהמשך",
+      "titleRequired": "חובה למלא כותרת",
+      "addressRequired": "פריט קבוצתי מחייב כתובת",
+      "timeLabel": "שעון הונגריה",
+      "personalNoAddressHint": "פריט אישי יכול להיות בלי כתובת"
+    },
+    "dnd": {
+      "reorderHint": "לחיצה ארוכה לגרירה לסידור מחדש",
+      "reordered": "הסדר נשמר",
+      "offlineQueued": "אין חיבור — הסדר יסונכרן בהמשך",
+      "moveUp": "העלה",
+      "moveDown": "הורד"
+    },
+    "comments": {
+      "title": "תגובות",
+      "empty": "אין תגובות עדיין",
+      "send": "שלח",
+      "tooLong": "עד 280 תווים"
     }
   }
 }
