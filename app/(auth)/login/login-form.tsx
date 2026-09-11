@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { t } from "@/lib/i18n";
@@ -11,12 +11,38 @@ type Stage = "idle" | "sending" | "sent" | "verifying" | "error";
  * Magic-link / email-OTP login (docs/02 §Auth flow, docs/12 §2).
  * The allowlist is enforced server-side (DB trigger) — a rejected email shows
  * the same neutral copy as a successful send so allowlist membership never leaks.
+ * On mount we instantiate the browser client so an email-link hash session
+ * (#access_token=… from implicit-flow confirmations) is consumed immediately.
  */
 export default function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [stage, setStage] = useState<Stage>(params.get("error") ? "error" : "idle");
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    (async () => {
+      // Admin-generated / fallback email links arrive in implicit form
+      // (#access_token=…) — consume them manually (PKCE projects ignore hashes).
+      const hash = window.location.hash;
+      const hashParams = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : "");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        if (!error) {
+          window.history.replaceState(null, "", window.location.pathname);
+          // Let cookie writes settle before the full navigation (avoids a rare
+          // ERR_FAILED when the middleware refresh races the first request).
+          window.setTimeout(() => window.location.replace("/today"), 300);
+          return;
+        }
+      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) window.location.replace("/today");
+    })();
+  }, []);
 
   async function sendLogin(event: React.FormEvent) {
     event.preventDefault();

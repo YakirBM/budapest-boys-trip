@@ -31,11 +31,34 @@ const securityHeaders = [
   },
 ];
 
+const dev = process.env.NODE_ENV === "development";
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          ...securityHeaders.filter((h) => h.key !== "Content-Security-Policy"),
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "img-src 'self' blob: data: https://zgvpchdqudheiohlrrvm.supabase.co",
+              "connect-src 'self' https://zgvpchdqudheiohlrrvm.supabase.co wss://zgvpchdqudheiohlrrvm.supabase.co",
+              "style-src 'self' 'unsafe-inline'",
+              // Dev-only: React Fast Refresh and the dev overlay require eval.
+              `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
   },
 };
 

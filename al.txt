@@ -1,0 +1,1 @@
+https://zgvpchdqudheiohlrrvm.supabase.co/auth/v1/verify?token=f8368a61aee0f2ef94d24ea816e9c6747a5a69c08bec974ae818b442&type=magiclink&redirect_to=http://localhost:3000/**

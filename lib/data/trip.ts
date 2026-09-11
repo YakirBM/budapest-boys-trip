@@ -38,18 +38,26 @@ export async function getTrip() {
 
 export async function getActiveMembers(): Promise<TripMember[]> {
   const supabase = await getSupabaseServerClient();
+  // NOTE: profiles cannot be embedded from trip_members via PostgREST — the FK
+  // goes through auth.users, which PostgREST (public schema) can't see. Two-step.
   const { data, error } = await supabase
     .from("trip_members")
-    .select("user_id, role, status, profiles(full_name)")
+    .select("user_id, role, status")
     .eq("trip_id", TRIP_ID)
     .order("sort_order");
   if (error) throw error;
-  return (data ?? []).map((row) => ({
+  const rows = data ?? [];
+  const ids = rows.map((r) => r.user_id);
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string]));
+  return rows.map((row) => ({
     user_id: row.user_id,
     role: row.role,
     status: row.status,
-    full_name:
-      (Array.isArray(row.profiles) ? row.profiles[0]?.full_name : null) ?? "—",
+    full_name: nameById.get(row.user_id) ?? "—",
   }));
 }
 

@@ -168,6 +168,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Only navigations may receive non-follow redirect handling. Never touch
+  // script/style requests (redirect mode "error") — responding to them with a
+  // redirected response throws "network error" in the page.
+  if (request.mode !== "navigate" && request.redirect !== "follow") return;
+
   if (request.mode === "navigate") {
     event.respondWith(staleWhileRevalidate(request, SHELL_CACHE, "/offline"));
     return;

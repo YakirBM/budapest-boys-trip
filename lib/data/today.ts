@@ -283,15 +283,23 @@ export function bufferForDay(dayNumber: number): number {
 /* ------------------------------------------------------------------ */
 
 export async function fetchMembers(supabase: SupabaseClient): Promise<MemberInfo[]> {
+  // Two-step fetch: profiles is not embeddable from trip_members (FK via auth.users).
   const { data, error } = await supabase
     .from("trip_members")
-    .select("user_id, role, status, profiles(full_name)")
+    .select("user_id, role, status")
     .eq("trip_id", TRIP_ID)
     .order("sort_order");
   if (error) throw error;
-  return (data ?? []).map((row) => ({
+  const rows = data ?? [];
+  const ids = rows.map((r) => r.user_id);
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in("id", ids.length > 0 ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string]));
+  return rows.map((row) => ({
     id: row.user_id,
-    fullName: (Array.isArray(row.profiles) ? row.profiles[0]?.full_name : null) ?? "—",
+    fullName: nameById.get(row.user_id) ?? "—",
     active: row.status === "active",
     role: row.role,
   }));
