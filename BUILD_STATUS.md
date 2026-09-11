@@ -8,7 +8,7 @@
 - **Milestone**: M1 (Foundations) ✅ **complete early** · M2 (MVP online) ✅ **features built** (pending live magic-link test) · M3 scope (offline/PWA) ✅ built (pending device UAT) · M4 hardening partially done (gates + scans; UAT/deploy pending)
 - **Build status**: `pnpm lint` ✅ 0 problems · `pnpm typecheck` ✅ 0 errors · `pnpm test` ✅ 39/39 · `pnpm build` ✅ 16 routes
 - **Database**: 16 migrations applied to `zgvpchdqudheiohlrrvm` (empty→seeded, non-destructive). Seed verification: **11/11 expected counts OK**. Both private buckets verified `public=false`.
-- **Not deployed** (B1 — Vercel auth needed). All local gates + live-DB integrations verified against the linked Supabase project.
+- **DEPLOYED (2026-09-11)**: https://medbadboys.vercel.app (prod alias; project yakirbm2026/budapest_boys_trip_sep2026). All post-deploy verifications green — see T-003.
 
 ## T-001 — Supabase publishable key 401: **RESOLVED (2026-09-11)**
 
@@ -41,7 +41,7 @@
 |---|---|---|---|
 | T-001 | Supabase key 401 | **done** | See above |
 | T-002 | Repo init | **done** | Versions above; strict + noUncheckedIndexedAccess |
-| T-003 | Vercel deploy | **blocked (B1)** | vercel.json (2 crons) + env names ready |
+| T-003 | Vercel deploy | **done** | Repo github.com/YakirBM/budapest-boys-trip (private) → Vercel. 4 env vars set via CLI (production+preview). Verified live: all 6 security headers; (app) routes → 307 /login; cron 401 without secret / 200 with secret (3 rates written from Vercel runtime); smoke e2e 5/5 vs prod (manifest he/rtl/standalone, SW fetch+sync handlers, offline page). Commit 76cf748 |
 | T-004–T-006 | Schema + RLS + Storage | **done** | 16 migrations pushed clean; 36 tables RLS'd, 72+ policies; storage INSERT+SELECT+DELETE; live probes: anon REST reads → empty (denied), publishable-key reads → 200, buckets public=false (25MB images-only / 10MB docs) |
 | T-007 | Seed | **done** | verify-seed.mjs **11/11 OK**; idempotent (ON CONFLICT ×18); mirrored as migration 0015 for `db push` |
 | T-008 | Auth flow | **done** (live mail test = T-025) | Allowlist trigger + handle_new_user (profile/membership/passengers/owner-claim); /login magic-link+OTP; /auth/callback; middleware gate (verified: unauthenticated /today → 307 /login) |
@@ -100,7 +100,7 @@ Visual audit (Playwright, 360/390/768/1280px): RTL correct, bidi-correct numeral
 
 | # | Blocker | Evidence | Needs | Independent work status |
 |---|---|---|---|---|
-| B1 | Vercel deploy (T-003) | `vercel` CLI not authenticated | User: `vercel login` → import repo → set 4 env vars (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`) for Production+Preview → deploy | All local/DB work done |
+| ~~B1~~ | ~~Vercel deploy~~ | resolved 2026-09-11 | — | cleared |
 | B2 | Real-device UAT (T-039) + member onboarding (T-025) | — | 2 phones + 5 member inboxes; Supabase Auth URL config must allow `http://localhost:3000/**` + `https://<vercel-domain>/**` | App fully built; UAT script ready |
 | B3 | RLS SQL suite execution (T-040) | CLI 2.108 has no arbitrary-SQL command; no DB password | DB password (`supabase db execute`-style via psql) or run `supabase/rls-tests.sql` in the dashboard SQL editor (header documents setup) | Anon/member/bucket probes done live; full 2-user suite pending |
 | B4 | Weather forecast horizon | Open-Meteo serves ≤16 days; trip (Oct 4–8) out of range until 2026-09-20 | None (self-resolving; cron clamps and fills automatically) | Resolved by design |
@@ -126,6 +126,6 @@ Visual audit (Playwright, 360/390/768/1280px): RTL correct, bidi-correct numeral
 - [ ] Verify Hungarian emergency phrases (draft is machine-translated, labeled)
 - [ ] Roei accept/decline → allowlist status update
 - [ ] Magic-link delivery test for all 5 emails (T-025); configure custom SMTP if rate-limited
-- [ ] Supabase Auth → URL Configuration: add production domain
+- [ ] Supabase Auth → URL Configuration: add `https://medbadboys.vercel.app/**` (localhost already added) — REQUIRED before magic links work from production
 - [ ] Rotate sb_secret/service-role keys (exposed in chat) and update .env.local + Vercel
 - [ ] Each member: insurance + (optional) medical profile + passport scan via the app (PRIVATE paths only)
