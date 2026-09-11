@@ -96,6 +96,21 @@ Visual audit (Playwright, 360/390/768/1280px): RTL correct, bidi-correct numeral
 - **Measured now**: SW precache ≈ 45 KB (icons 32 KB + prerendered HTML gzip ≈ 3 KB/page + manifest) — budget < 2 MB ✅. Per-route First Load JS from build output (max 254 KB) ✅ reasonable for mid-tier Android.
 - **Pending deploy/auth**: Lighthouse (or web-vitals in-app) on `/today` cold, Moto G-class throttle (4G, 4× CPU): LCP < 2.5 s, TTI < 3.5 s, CLS < 0.1; expense-entry ≤ 15 s human; upload start ≤ 3 s. **Not claimed without these measurements.**
 
+## Post-deploy debugging round (2026-09-11, after first user sign-in attempt)
+
+| # | Symptom | Root cause | Fix | Verified |
+|---|---|---|---|---|
+| D1 | Console: script MIME/redirect errors on /login | `theme-init.js` not excluded from auth middleware → script request 307ed to /login HTML | middleware matcher + PUBLIC_PATHS exclusions | curl: 200 application/javascript ✓ |
+| D2 | Email link redirected to site root, not /auth/callback | `emailRedirectTo` not in Supabase redirect allowlist → fell back to Site URL (user had set Site URL to `http://localhost:3000/**`) | `/?code=` forwarding added to root page; **user must set Site URL = https://medbadboys.vercel.app** and keep both Redirect URLs | pending user config |
+| D3 | POST /auth/v1/otp → 429 | Supabase built-in SMTP per-email rate limit | wait/reset window; **custom SMTP recommended before onboarding 3 more members** (doc 12 §2) | expected |
+| D4 | Authenticated pages 500 (PGRST200) | `profiles(full_name)` embed from trip_members — FK goes via auth.users, invisible to PostgREST | two-step fetch (members then profiles) in lib/data/trip.ts + today.ts | 12/12 pages render authed ✓ |
+| D5 | /money 500 (42703 column "net" does not exist) | doc 03 §8 suggest_settlements referenced `net`; view column is `net_base_huf` (doc bug, plpgsql validates at first execution) | migration 0017 + doc 03 §8 corrected | /money renders ✓ |
+| D6 | /media 404 for authed users in production only | **.gitignore `media/` pattern matched ANY media dir** — app/(app)/media/ + components/feature/media/ were never committed | pattern root-anchored to `/media/`; hidden files committed | /media renders ✓ |
+| D7 | Intermittent chrome-error right after login | middleware redirect authed-/login→/today alternated with transient getUser() failure → redirect loop | removed authed-/login redirect from middleware (login page effect handles it) | login lands on /today ✓ |
+| D8 | SW FetchEvent network-error noise | SW responded to non-follow-redirect requests | SW guard: only navigations get non-follow handling | fixed in sw.js |
+
+Final state: **12/12 authenticated pages render on production (today/route/map/money/flights/stay/transit/checklists/media/safety/decisions/more), zero 4xx/5xx in sweep.** Verification method: admin generate_link → real browser session → page sweep (scripts preserved in git history).
+
 ## Blockers register
 
 | # | Blocker | Evidence | Needs | Independent work status |
