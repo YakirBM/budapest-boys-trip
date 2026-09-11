@@ -120,7 +120,7 @@ export function BottomSheet({ open, onClose, title, children, destructive = fals
         ref={panelRef}
         tabIndex={-1}
         className={clsx(
-          "absolute inset-x-0 bottom-0 mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-surface-raised pb-safe outline-none",
+          "absolute inset-x-0 bottom-0 mx-auto flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-surface-raised pb-safe outline-none",
           !dragging && "anim-sheet-in",
           className,
         )}
@@ -137,8 +137,8 @@ export function BottomSheet({ open, onClose, title, children, destructive = fals
           <span aria-hidden className="h-1 w-10 rounded-full bg-border" />
         </div>
 
-        <div className="flex items-center justify-between px-4 pb-2 pt-1">
-          <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 pt-1">
+          <h2 className="min-w-0 truncate text-lg font-semibold text-text-primary">{title}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -149,7 +149,7 @@ export function BottomSheet({ open, onClose, title, children, destructive = fals
           </button>
         </div>
 
-        <div className="overflow-y-auto px-4 pb-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">{children}</div>
       </div>
     </div>
   );

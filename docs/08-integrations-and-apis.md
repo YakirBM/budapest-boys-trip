@@ -13,7 +13,9 @@ provider we use and why, exact endpoints, caching, and what happens when it fail
 
 Guiding rules:
 
-- **Client never calls external APIs directly.** All third-party data flows through a
+- **Client never calls external data APIs directly.** The sole transport exception is standard
+  raster image tile loading for the interactive map; it sends no app data and uses no key. All
+  weather/FX and other third-party data flows through a
   daily server-side cron into Supabase cache tables (`weather_cache`, `exchange_rates`);
   the app reads only from the DB. This keeps us offline-first, avoids API-key exposure,
   and makes failure states uniform ("stale badge" instead of a broken widget).
@@ -81,12 +83,20 @@ Money screen. Never present converted amounts as exact.
 - [ ] Add the mid-market disclaimer string to the i18n messages file.
 - [ ] Verify Frankfurter.app is up and free at build time; fallback = last cached + stale badge.
 
-## 3. Maps & navigation deep links
+## 3. Interactive map & navigation deep links
 
 **Purpose:** every place/schedule item gets a "navigate" action — zero ambiguity.
 
-**Approach:** universal URL deep links, no Maps SDK, no API key. One helper module
-owns all URL building: `lib/utils/deeplinks.ts`.
+**Approach:** MapLibre GL JS renders an interactive map only on `/map`, using standard
+OpenStreetMap raster tiles with visible attribution and no API key. The map module is dynamically
+loaded. Universal navigation deep links remain the reliable handoff to a navigation app, and one
+helper module owns all URL building: `lib/utils/deeplinks.ts`.
+
+Tile rules: normal interactive browser viewing only; no bulk downloading, offline tile pack, or
+prefetch crawler. When tiles are unavailable, the cached place/anchor list remains usable. Current
+location is requested only after an explicit tap and is never persisted. Straight-line distance is
+calculated locally with Haversine; walking time is clearly labelled as an estimate using 4.8 km/h,
+not as live routing or traffic data.
 
 **Spec for `lib/utils/deeplinks.ts`:**
 
@@ -237,12 +247,12 @@ Spec:
 |-------------|----------|------|--------------|-------|----------|
 | Weather | Open-Meteo | Free | No | `weather_cache`, daily cron | Last cached + stale badge |
 | FX rates | Frankfurter.app (ECB) | Free | No | `exchange_rates`, daily cron + manual override | Last cached + stale badge |
-| Maps / navigation | Google Maps URLs / Apple / Waze | Free | No | n/a (URL builders) | Alternate provider link |
+| Maps / navigation | MapLibre + OpenStreetMap tiles; Google/Apple/Waze handoff | Free | No | Browser HTTP cache only; no offline tile pack | Cached place list + provider links |
 | Transit | BudapestGO / bkk.hu | Free | No (no API in MVP) | Static content, offline-cached | Install links + bkk.hu link |
 | Calendar | Hand-built ICS + Google template | Free | No | n/a | Manual entry |
 | Communication | wa.me / tel: / mailto: | Free | No | n/a | Copy-to-clipboard |
 | Flights | Arkia website, manual status | Free | No | Manual status in DB | Member updates manually |
-| Image processing | Browser Canvas (client-side) | Free | No | n/a | Upload original if compression fails |
+| Image processing | Browser Canvas (client-side) | Free | No | n/a | Reject safely if compression fails |
 
 ## 10. Rate limits & cost guardrails
 
@@ -268,12 +278,13 @@ Spec:
       links, all readable offline.
 - [ ] Downloaded `.ics` for IZ291 imports correctly with `Europe/Budapest` /
       `Asia/Jerusalem` timezones on Google Calendar and Apple Calendar.
-- [ ] No external API call originates from the browser (verify via DevTools network tab).
+- [ ] No external data API call originates from the browser; only OpenStreetMap raster tile image
+      requests are permitted (verify via DevTools network tab and CSP).
 - [ ] All dynamic figures in UI carry visible or inspectable `source` + `last_verified_at`.
 
 ## Out of scope
 
 - Real-time flight status APIs, live transit APIs, in-app ticket purchasing.
-- Map SDKs (Google Maps JS, Mapbox) — deep links only.
+- Paid/proprietary map SDKs and in-app turn-by-turn navigation.
 - Server-side image processing pipelines.
 - Paid tiers of any provider.

@@ -339,6 +339,19 @@ create table public.media_items (
   size_bytes bigint,  width int,  height int,
   status media_status not null default 'active'     -- soft delete: hide, keep object
 );
+create table public.media_albums (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid not null references public.trips(id) on delete cascade,
+  name text not null,
+  description text,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz,
+  unique (trip_id, name)                           -- implemented case-insensitively
+);
+-- Added by 20260911081817_media_library_metadata.sql:
+-- media_items.title, original_filename, album_id, tags[]; linked_place_id and
+-- tagged_member_ids remain the canonical place/person classifications.
 create table public.media_reactions (
   media_id uuid not null references public.media_items(id) on delete cascade,
   member_id uuid not null references auth.users(id) on delete cascade,

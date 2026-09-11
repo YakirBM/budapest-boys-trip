@@ -40,7 +40,7 @@ function currencyChipRow(
   return (
     <div>
       <p className="mb-1 text-xs font-semibold text-text-muted">{label}</p>
-      <div role="radiogroup" aria-label={label} className="grid grid-cols-4 gap-1 rounded-xl bg-surface-raised p-1">
+      <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-1 rounded-xl bg-surface-raised p-1 min-[360px]:grid-cols-4">
         {CURRENCIES.map((code) => (
           <button
             key={code}

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -16,16 +17,15 @@ export interface TripMember {
   full_name: string;
 }
 
-export async function requireUser() {
+export const requireUser = cache(async (): Promise<{ id: string }> => {
   const supabase = await getSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  return user;
-}
+  const { data, error } = await supabase.auth.getClaims();
+  const id = data?.claims?.sub;
+  if (error || typeof id !== "string" || id.length === 0) redirect("/login");
+  return { id };
+});
 
-export async function getTrip() {
+export const getTrip = cache(async () => {
   const supabase = await getSupabaseServerClient();
   const { data, error } = await supabase
     .from("trips")
@@ -34,9 +34,9 @@ export async function getTrip() {
     .maybeSingle();
   if (error) throw error;
   return data;
-}
+});
 
-export async function getActiveMembers(): Promise<TripMember[]> {
+export const getActiveMembers = cache(async (): Promise<TripMember[]> => {
   const supabase = await getSupabaseServerClient();
   // NOTE: profiles cannot be embedded from trip_members via PostgREST — the FK
   // goes through auth.users, which PostgREST (public schema) can't see. Two-step.
@@ -59,7 +59,7 @@ export async function getActiveMembers(): Promise<TripMember[]> {
     status: row.status,
     full_name: nameById.get(row.user_id) ?? "—",
   }));
-}
+});
 
 export async function getDayPlans() {
   const supabase = await getSupabaseServerClient();

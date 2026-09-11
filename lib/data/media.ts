@@ -20,6 +20,24 @@ export interface MediaItemRow {
   uploaded_at: string;
   size_bytes: number | null;
   mime_stored: string;
+  title: string | null;
+  original_filename: string | null;
+  album_id: string | null;
+  linked_place_id: string | null;
+  tagged_member_ids: string[];
+  tags: string[];
+}
+
+export interface MediaAlbumRow {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string;
+}
+
+export interface MediaPlaceRow {
+  id: string;
+  name: string;
 }
 
 export interface MediaReactionRow {
@@ -34,6 +52,8 @@ export interface MediaReactionRow {
 export interface MediaBoard {
   items: MediaItemRow[];
   reactions: MediaReactionRow[];
+  albums: MediaAlbumRow[];
+  places: MediaPlaceRow[];
 }
 
 /** Hard cap for the MVP grid (no infinite scroll — simplification, reported). */
@@ -42,16 +62,22 @@ export const MEDIA_PAGE_LIMIT = 240;
 export async function getMediaBoard(tripId: string): Promise<MediaBoard> {
   const supabase = await getSupabaseServerClient();
 
-  const res = await supabase
-    .from("media_items")
-    .select(
-      "id,uploader_id,storage_path,thumbnail_path,width,height,day_number,caption,visibility,is_moment_of_day,uploaded_at,size_bytes,mime_stored",
-    )
-    .eq("trip_id", tripId)
-    .eq("status", "active")
-    .order("uploaded_at", { ascending: false })
-    .limit(MEDIA_PAGE_LIMIT);
+  const [res, albumsRes, placesRes] = await Promise.all([
+    supabase
+      .from("media_items")
+      .select(
+        "id,uploader_id,storage_path,thumbnail_path,width,height,day_number,caption,visibility,is_moment_of_day,uploaded_at,size_bytes,mime_stored,title,original_filename,album_id,linked_place_id,tagged_member_ids,tags",
+      )
+      .eq("trip_id", tripId)
+      .eq("status", "active")
+      .order("uploaded_at", { ascending: false })
+      .limit(MEDIA_PAGE_LIMIT),
+    supabase.from("media_albums").select("id,name,description,created_by").eq("trip_id", tripId).order("name"),
+    supabase.from("places").select("id,name").eq("trip_id", tripId).neq("status", "rejected").order("name"),
+  ]);
   if (res.error) throw res.error;
+  if (albumsRes.error) throw albumsRes.error;
+  if (placesRes.error) throw placesRes.error;
 
   const items = ((res.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
     id: String(row["id"]),
@@ -67,6 +93,12 @@ export async function getMediaBoard(tripId: string): Promise<MediaBoard> {
     uploaded_at: String(row["uploaded_at"]),
     size_bytes: row["size_bytes"] === null ? null : Number(row["size_bytes"]),
     mime_stored: String(row["mime_stored"] ?? "image/webp"),
+    title: row["title"] === null ? null : String(row["title"]),
+    original_filename: row["original_filename"] === null ? null : String(row["original_filename"]),
+    album_id: row["album_id"] === null ? null : String(row["album_id"]),
+    linked_place_id: row["linked_place_id"] === null ? null : String(row["linked_place_id"]),
+    tagged_member_ids: Array.isArray(row["tagged_member_ids"]) ? row["tagged_member_ids"].map(String) : [],
+    tags: Array.isArray(row["tags"]) ? row["tags"].map(String) : [],
   }));
 
   const itemIds = items.map((i) => i.id);
@@ -83,6 +115,13 @@ export async function getMediaBoard(tripId: string): Promise<MediaBoard> {
 
   return {
     items,
+    albums: (albumsRes.data ?? []).map((row) => ({
+      id: String(row.id),
+      name: String(row.name),
+      description: row.description === null ? null : String(row.description),
+      created_by: String(row.created_by),
+    })),
+    places: (placesRes.data ?? []).map((row) => ({ id: String(row.id), name: String(row.name) })),
     reactions: ((reactionsRes.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
       id: String(row["id"]),
       media_id: String(row["media_id"]),

@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, Map, MoreHorizontal, Route, Wallet, type LucideIcon } from "lucide-react";
 import { t } from "@/lib/i18n";
 
@@ -31,6 +31,7 @@ function isActive(pathname: string, href: string): boolean {
  */
 export function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <nav aria-label={t("nav.label")} className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 pb-safe backdrop-blur">
@@ -42,6 +43,9 @@ export function BottomNav() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
+              onPointerEnter={() => router.prefetch(href)}
+              onFocus={() => router.prefetch(href)}
+              onTouchStart={() => router.prefetch(href)}
               className={clsx(
                 "relative flex min-w-12 flex-1 flex-col items-center justify-center gap-1 rounded-lg",
                 "transition-colors duration-150",

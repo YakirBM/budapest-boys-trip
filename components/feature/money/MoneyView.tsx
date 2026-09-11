@@ -215,9 +215,9 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
     <>
       {/* Stats */}
       <section aria-label={t("money.title")} className="mb-4 grid grid-cols-2 gap-2">
-        <Card className="flex flex-col gap-1">
+        <Card className="min-w-0 overflow-hidden p-3 sm:p-4 flex flex-col gap-1">
           <span className="text-xs font-semibold text-text-muted">{t("money.myTotal")}</span>
-          <span dir="ltr" className="tnum text-xl font-bold text-text-primary">
+          <span dir="ltr" className="tnum truncate text-base font-bold text-text-primary min-[380px]:text-xl">
             {formatMoney(stats.myShared, "HUF")}
           </span>
           <span className="text-xs text-text-muted">
@@ -225,9 +225,9 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
             <span dir="ltr" className="tnum">{formatMoney(stats.personal, "HUF")}</span>
           </span>
         </Card>
-        <Card className="flex flex-col gap-1">
+        <Card className="min-w-0 overflow-hidden p-3 sm:p-4 flex flex-col gap-1">
           <span className="text-xs font-semibold text-text-muted">{t("money.groupTotal")}</span>
-          <span dir="ltr" className="tnum text-xl font-bold text-text-primary">
+          <span dir="ltr" className="tnum truncate text-base font-bold text-text-primary min-[380px]:text-xl">
             {formatMoney(stats.group, "HUF")}
           </span>
           <span className="text-xs text-text-muted">
@@ -270,7 +270,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
 
       {/* Balances */}
       <Card className="mb-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-text-primary">{t("money.balancesTitle")}</h2>
           {isOwner && (
             <button
@@ -289,17 +289,17 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
             const label =
               net > 0 ? t("money.owed") : net < 0 ? t("money.owes") : t("money.even");
             return (
-              <li key={b.user_id} className="flex items-center justify-between gap-2 rounded-lg bg-surface-raised px-3 py-2">
+              <li key={b.user_id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-lg bg-surface-raised px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_auto_auto]">
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">
                   {nameOf.get(b.user_id) ?? "—"}
                 </span>
                 <span
-                  className={netToneClass(net)}
+                  className={`${netToneClass(net)} justify-self-end`}
                   aria-label={`${label}: ${formatMoney(Math.abs(net), "HUF")}`}
                 >
                   {label}
                 </span>
-                <span dir="ltr" className="tnum text-sm font-bold text-text-primary">
+                <span dir="ltr" className="tnum col-span-2 justify-self-end whitespace-nowrap text-sm font-bold text-text-primary min-[380px]:col-span-1">
                   {formatMoney(Math.abs(net), "HUF")}
                 </span>
               </li>
@@ -325,7 +325,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
               return (
                 <li
                   key={key}
-                  className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_auto_auto]"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
                     <span className="font-semibold">{nameOf.get(transfer.from_user) ?? "—"}</span>
@@ -340,8 +340,8 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                     onClick={() => markTransferPaid(key)}
                     className={
                       paid
-                        ? "inline-flex min-h-10 items-center rounded-lg bg-success/12 px-2 text-xs font-bold text-success"
-                        : "inline-flex min-h-10 items-center rounded-lg border border-border px-2 text-xs font-bold text-text-secondary transition-opacity active:opacity-80"
+                        ? "col-span-2 inline-flex min-h-10 items-center justify-center rounded-lg bg-success/12 px-2 text-xs font-bold text-success min-[380px]:col-span-1"
+                        : "col-span-2 inline-flex min-h-10 items-center justify-center rounded-lg border border-border px-2 text-xs font-bold text-text-secondary transition-opacity active:opacity-80 min-[380px]:col-span-1"
                     }
                   >
                     {paid ? "✓" : t("money.markTransferPaid")}
@@ -377,7 +377,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                     return (
                       <li
                         key={e.id}
-                        className="flex items-center gap-2.5 rounded-xl border border-border bg-surface p-3"
+                        className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-xl border border-border bg-surface p-3 min-[380px]:grid-cols-[auto_minmax(0,1fr)_auto]"
                       >
                         <ExpenseCategoryIcon category={e.category} size={36} />
                         <div className="min-w-0 flex-1">
@@ -403,7 +403,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                             )}
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="col-span-2 flex min-w-0 flex-row items-center justify-between gap-2 ps-12 min-[380px]:col-span-1 min-[380px]:flex-col min-[380px]:items-end min-[380px]:ps-0">
                           <MoneyAmount
                             amount={e.amount}
                             currency={cur as (typeof CURRENCIES)[number]}

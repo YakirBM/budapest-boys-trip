@@ -31,25 +31,47 @@ const EXPECTED = {
   emergency_contacts: 3,
   transit_tickets: 6,
   transit_anchor_stations: 4,
-  flight_passengers: 0, // created on signup by trigger
   expenses: 0,
 };
 
 let failures = 0;
-for (const [table, expected] of Object.entries(EXPECTED)) {
+const counts = new Map();
+async function countRows(table) {
   const res = await fetch(`${URL_}/rest/v1/${table}?select=*`, {
     headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: "count=exact", Range: "0-0" },
   });
-  if (!res.ok) {
-    console.log(`FAIL ${table}: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${table}: HTTP ${res.status}`);
+  return Number((res.headers.get("content-range") ?? "*/0").split("/")[1] ?? 0);
+}
+
+for (const [table, expected] of Object.entries(EXPECTED)) {
+  let count;
+  try {
+    count = await countRows(table);
+  } catch (error) {
+    console.log(`FAIL ${error instanceof Error ? error.message : table}`);
     failures += 1;
     continue;
   }
-  const range = res.headers.get("content-range") ?? "*/0";
-  const count = Number(range.split("/")[1] ?? 0);
+  counts.set(table, count);
   const ok = count === expected;
   if (!ok) failures += 1;
   console.log(`${ok ? "OK  " : "FAIL"} ${table}: ${count} (expected ${expected})`);
+}
+
+// Flight passenger rows are intentionally dynamic: the signup trigger creates
+// one row per seeded flight for every real trip member. Validate the invariant
+// instead of incorrectly requiring the pre-signup count of zero forever.
+try {
+  const memberCount = await countRows("trip_members");
+  const passengerCount = await countRows("flight_passengers");
+  const expectedPassengers = memberCount * (counts.get("flights") ?? 0);
+  const ok = passengerCount === expectedPassengers;
+  if (!ok) failures += 1;
+  console.log(`${ok ? "OK  " : "FAIL"} flight_passengers: ${passengerCount} (expected ${expectedPassengers} from ${memberCount} members × ${counts.get("flights") ?? 0} flights)`);
+} catch (error) {
+  console.log(`FAIL ${error instanceof Error ? error.message : "dynamic passenger check"}`);
+  failures += 1;
 }
 
 // Masked-refs scan: no full reservation/serial may exist anywhere in seedable data

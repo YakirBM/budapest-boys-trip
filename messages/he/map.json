@@ -1,7 +1,13 @@
 {
   "map": {
     "title": "מפה",
-    "schematicNote": "שרטוט סכמטי בלבד — לניווט השתמשו בכפתור נווט",
+    "schematicNote": "תצוגת מיקום סכמטית",
+    "realMapNote": "מפת OpenStreetMap אינטראקטיבית · מרחק וזמן הליכה הם הערכה בקו אווירי",
+    "locateMe": "המיקום שלי",
+    "currentLocation": "המיקום הנוכחי שלי",
+    "walkingEstimate": "{distance} · כ־{minutes} דק׳ הליכה",
+    "locationError": "לא ניתן לקבל את המיקום. אפשר להמשיך להשתמש במפה ובכפתורי הניווט.",
+    "offlineMap": "המפה הגאוגרפית דורשת חיבור, אך רשימת המקומות ופרטי הניווט עדיין זמינים.",
     "legendIdea": "רעיון",
     "legendApproved": "מאושר",
     "legendScheduled": "משובץ",

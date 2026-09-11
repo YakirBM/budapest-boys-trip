@@ -42,8 +42,8 @@ const sizeClasses = {
  */
 export function MoneyAmount({ amount, currency, convertedTo, size = "md", className }: MoneyAmountProps) {
   return (
-    <span className={clsx("inline-flex flex-col items-start gap-0.5", className)}>
-      <span dir="ltr" className={clsx("ltr-iso tnum font-semibold", sizeClasses[size])}>
+    <span className={clsx("inline-flex min-w-0 max-w-full flex-col items-start gap-0.5", className)}>
+      <span dir="ltr" className={clsx("ltr-iso tnum whitespace-nowrap font-semibold", sizeClasses[size])}>
         {formatMoney(amount, currency)}
       </span>
       {convertedTo && (

@@ -339,7 +339,7 @@ export function ExpenseForm({
 
         <div>
           <p className="mb-1 text-xs font-semibold text-text-muted">{t("money.form.categoryLabel")}</p>
-          <div role="radiogroup" aria-label={t("money.form.categoryLabel")} className="grid grid-cols-4 gap-1">
+          <div role="radiogroup" aria-label={t("money.form.categoryLabel")} className="grid grid-cols-2 gap-1 min-[380px]:grid-cols-4">
             {EXPENSE_CATEGORIES.map((code) => (
               <button
                 key={code}
@@ -363,7 +363,7 @@ export function ExpenseForm({
 
         <div>
           <p className="mb-1 text-xs font-semibold text-text-muted">{t("money.form.amountLabel")}</p>
-          <div className="flex gap-2">
+          <div className="flex min-w-0 flex-col gap-2 min-[380px]:flex-row">
             <input
               type="text"
               inputMode="decimal"
@@ -372,12 +372,12 @@ export function ExpenseForm({
               onChange={(e) => setAmountText(e.target.value)}
               placeholder={t("money.form.amountPlaceholder")}
               aria-label={t("money.form.amountLabel")}
-              className={clsx(inputClass(), "flex-1 text-lg font-bold tnum")}
+              className={clsx(inputClass(), "min-w-0 flex-1 text-lg font-bold tnum")}
             />
             <div
               role="radiogroup"
               aria-label={currency}
-              className="grid grid-cols-2 gap-1 rounded-xl bg-surface-raised p-1"
+              className="grid shrink-0 grid-cols-4 gap-1 rounded-xl bg-surface-raised p-1 min-[380px]:grid-cols-2"
             >
               {CURRENCIES.map((code) => (
                 <button
@@ -387,7 +387,7 @@ export function ExpenseForm({
                   aria-checked={currency === code}
                   onClick={() => setCurrency(code)}
                   className={clsx(
-                    "min-h-10 min-w-14 rounded-lg px-2 text-xs font-bold transition-[background-color,color]",
+                    "min-h-10 min-w-0 rounded-lg px-1 text-xs font-bold transition-[background-color,color] min-[380px]:min-w-14 min-[380px]:px-2",
                     currency === code ? "bg-brand text-brand-contrast" : "text-text-secondary",
                   )}
                 >
@@ -416,7 +416,7 @@ export function ExpenseForm({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-text-muted">{t("money.form.payerLabel")}</span>
             <select
@@ -500,7 +500,7 @@ export function ExpenseForm({
 
             <div>
               <p className="mb-1 text-xs font-semibold text-text-muted">{t("money.form.splitLabel")}</p>
-              <div role="radiogroup" aria-label={t("money.form.splitLabel")} className="grid grid-cols-4 gap-1 rounded-xl bg-surface-raised p-1">
+              <div role="radiogroup" aria-label={t("money.form.splitLabel")} className="grid grid-cols-2 gap-1 rounded-xl bg-surface-raised p-1 min-[380px]:grid-cols-4">
                 {METHODS.map((m) => (
                   <button
                     key={m}

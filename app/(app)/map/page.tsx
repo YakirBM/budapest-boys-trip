@@ -5,15 +5,15 @@ import { fetchMapData } from "@/lib/data/route";
 import { MapView } from "@/components/feature/map/MapView";
 
 /**
- * Map tab (docs/06-features/01 §Map tab). No map SDK: schematic frame with
- * status-colored place markers + the transit-anchor layer from the DB.
+ * Map tab (docs/06-features/01 §Map tab). The client map is lazy-loaded;
+ * server data and the offline place list remain available independently.
  */
 export default async function MapPage() {
   const supabase = await getSupabaseServerClient();
   const initialData = await fetchMapData(supabase);
   return (
     <>
-      <Header title={t("map.title")} subtitle={t("map.schematicNote")} />
+      <Header title={t("map.title")} subtitle={t("map.realMapNote")} />
       <MapView initialData={initialData} />
     </>
   );

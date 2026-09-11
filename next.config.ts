@@ -20,10 +20,11 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "img-src 'self' blob: data: https://zgvpchdqudheiohlrrvm.supabase.co",
+      "img-src 'self' blob: data: https://zgvpchdqudheiohlrrvm.supabase.co https://tile.openstreetmap.org",
       "connect-src 'self' https://zgvpchdqudheiohlrrvm.supabase.co wss://zgvpchdqudheiohlrrvm.supabase.co",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline'",
+      "worker-src 'self' blob:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -46,11 +47,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "img-src 'self' blob: data: https://zgvpchdqudheiohlrrvm.supabase.co",
+              "img-src 'self' blob: data: https://zgvpchdqudheiohlrrvm.supabase.co https://tile.openstreetmap.org",
               "connect-src 'self' https://zgvpchdqudheiohlrrvm.supabase.co wss://zgvpchdqudheiohlrrvm.supabase.co",
               "style-src 'self' 'unsafe-inline'",
               // Dev-only: React Fast Refresh and the dev overlay require eval.
               `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+              "worker-src 'self' blob:",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
-import { Navigation, Star, TrainFront } from "lucide-react";
+import { LocateFixed, Navigation, Star, TrainFront } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { fetchMapData, TRIP_ID, type MapData, type MapPlace } from "@/lib/data/route";
@@ -14,13 +15,11 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { MoneyAmount } from "@/components/ui/MoneyAmount";
+import { estimatedWalkingMinutes, formatDistance, haversineMeters, type GeoPoint } from "@/lib/utils/geo";
 
 export interface MapViewProps {
   initialData: MapData;
 }
-
-/** Budapest framing bbox (scope decision; doc 01 rule 10 layers). */
-const BBOX = { latMin: 47.42, latMax: 47.56, lngMin: 18.93, lngMax: 19.14 };
 
 type MarkerKind = "idea" | "approved" | "scheduled";
 
@@ -30,30 +29,15 @@ const MARKER_COLORS: Record<MarkerKind, string> = {
   scheduled: "var(--color-info)",
 };
 
-function normalize(lat: number, lng: number): { x: number; y: number; clamped: boolean } {
-  const rawX = ((lng - BBOX.lngMin) / (BBOX.lngMax - BBOX.lngMin)) * 100;
-  const rawY = ((BBOX.latMax - lat) / (BBOX.latMax - BBOX.latMin)) * 100;
-  const clamp = (v: number) => Math.min(94, Math.max(6, v));
-  return {
-    x: clamp(rawX),
-    y: clamp(rawY),
-    clamped: rawX < 0 || rawX > 100 || rawY < 0 || rawY > 100,
-  };
-}
-
-function placeKind(place: MapPlace): MarkerKind {
-  if (place.status === "scheduled" || place.status === "visited") return "scheduled";
-  if (place.status === "approved") return "approved";
-  return "idea";
-}
+const InteractiveMap = dynamic(() => import("./InteractiveMap"), {
+  ssr: false,
+  loading: () => <div className="h-[54dvh] min-h-80 w-full animate-pulse bg-surface-raised" />,
+});
 
 /**
- * MapView — NO map SDK (hard decision): a schematic tinted frame with
- * status-colored positioned markers + the anchor layer. Tap a marker → place
- * sheet with a navigate deep link. Places without coordinates land in the
- * "רשימה בלי מיקום" tray so they are never lost. Geographic x/y is NOT
- * mirrored under RTL (a map, like a clock, keeps its orientation) — inline
- * `left/top` are used deliberately for geographic correctness.
+ * MapView — dynamically loads MapLibre only on this route, renders geographic
+ * OpenStreetMap tiles, and keeps the cached no-location list as its fallback.
+ * Geographic orientation is deliberately LTR even though controls/content are RTL.
  */
 export function MapView({ initialData }: MapViewProps) {
   const query = useQuery({
@@ -68,16 +52,14 @@ export function MapView({ initialData }: MapViewProps) {
   const [showPlacesLayer, setShowPlacesLayer] = useState(true);
   const [showAnchorsLayer, setShowAnchorsLayer] = useState(true);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<GeoPoint | null>(null);
+  const [locationState, setLocationState] = useState<"idle" | "loading" | "error">("idle");
 
   const placedMarkers = useMemo(
     () =>
       data.places
         .filter((place) => place.lat !== null && place.lng !== null)
-        .filter((place) => place.status !== "rejected")
-        .map((place) => ({
-          place,
-          ...normalize(place.lat as number, place.lng as number),
-        })),
+        .filter((place) => place.status !== "rejected"),
     [data.places],
   );
   const noLocationPlaces = data.places.filter(
@@ -86,13 +68,38 @@ export function MapView({ initialData }: MapViewProps) {
   const anchorMarkers = useMemo(
     () =>
       data.anchors
-        .filter((anchor) => anchor.lat !== null && anchor.lng !== null)
-        .map((anchor) => ({ anchor, ...normalize(anchor.lat as number, anchor.lng as number) })),
+        .filter((anchor) => anchor.lat !== null && anchor.lng !== null),
     [data.anchors],
   );
   const anchorsWithoutCoords = data.anchors.filter((a) => a.lat === null || a.lng === null);
 
   const selectedPlace = data.places.find((place) => place.id === selectedPlaceId) ?? null;
+  const estimateOrigin = userLocation ?? anchorMarkers[0] ?? null;
+  const selectedDistance =
+    selectedPlace?.lat !== null && selectedPlace?.lat !== undefined &&
+    selectedPlace.lng !== null && estimateOrigin?.lat !== null && estimateOrigin?.lat !== undefined &&
+    estimateOrigin.lng !== null && estimateOrigin.lng !== undefined
+      ? haversineMeters(
+          { lat: estimateOrigin.lat, lng: estimateOrigin.lng },
+          { lat: selectedPlace.lat, lng: selectedPlace.lng },
+        )
+      : null;
+
+  function locateMe(): void {
+    if (!("geolocation" in navigator)) {
+      setLocationState("error");
+      return;
+    }
+    setLocationState("loading");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setUserLocation({ lat: coords.latitude, lng: coords.longitude });
+        setLocationState("idle");
+      },
+      () => setLocationState("error"),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
 
   const layerButtonClass = (active: boolean) =>
     clsx(
@@ -121,7 +128,22 @@ export function MapView({ initialData }: MapViewProps) {
           <TrainFront aria-hidden size={16} />
           {t("map.layerAnchors")}
         </button>
+        <button
+          type="button"
+          onClick={locateMe}
+          disabled={locationState === "loading"}
+          className={layerButtonClass(userLocation !== null)}
+        >
+          <LocateFixed aria-hidden size={16} />
+          {locationState === "loading" ? t("common.loading") : t("map.locateMe")}
+        </button>
       </div>
+
+      {locationState === "error" && (
+        <p className="rounded-xl bg-warning/10 px-3 py-2 text-xs text-warning" role="alert">
+          {t("map.locationError")}
+        </p>
+      )}
 
       {/* Legend */}
       <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
@@ -143,54 +165,37 @@ export function MapView({ initialData }: MapViewProps) {
         </li>
       </ul>
 
-      {/* Schematic frame — plain tinted background, never blank (doc 01 offline) */}
-      <div
-        role="img"
-        aria-label={t("map.schematicNote")}
-        className="relative aspect-square w-full overflow-hidden rounded-2xl border border-border"
-        style={{
-          background: "linear-gradient(180deg, var(--color-brand-soft) 0%, var(--color-surface-raised) 100%)",
-        }}
-      >
-        <span aria-hidden className="pointer-events-none absolute inset-x-5 bottom-5 top-5 rounded-[42%] border border-border/70" />
-        {showPlacesLayer &&
-          placedMarkers.map(({ place, x, y, clamped }) => {
-            const kind = placeKind(place);
-            return (
-              <button
-                key={place.id}
-                type="button"
-                onClick={() => setSelectedPlaceId(place.id)}
-                aria-label={clamped ? `${place.name} — ${t("map.outOfFrame")}` : place.name}
-                title={clamped ? t("map.outOfFrame") : place.name}
-                className="absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-                style={{ left: `${x}%`, top: `${y}%` }}
-              >
-                <span
-                  className={clsx(
-                    "tnum flex items-center justify-center rounded-full border-2 border-surface text-[10px] font-bold text-white shadow",
-                    kind === "scheduled" ? "h-7 w-7" : "h-6 w-6",
-                  )}
-                  style={{ backgroundColor: MARKER_COLORS[kind] }}
-                >
-                  {kind === "scheduled" && place.scheduledDay !== null ? place.scheduledDay : ""}
-                </span>
-              </button>
-            );
-          })}
-        {showAnchorsLayer &&
-          anchorMarkers.map(({ anchor, x, y }) => (
-            <span
-              key={anchor.id}
-              aria-hidden
-              className="pointer-events-none absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-              style={{ left: `${x}%`, top: `${y}%` }}
-            >
-              <Star size={22} className="fill-brand text-brand" />
-            </span>
-          ))}
+      <div className="overflow-hidden rounded-2xl border border-border bg-surface-raised">
+        {isOffline ? (
+          <div className="grid min-h-80 place-items-center p-6 text-center text-sm text-text-secondary">
+            {t("map.offlineMap")}
+          </div>
+        ) : (
+          <InteractiveMap
+            places={placedMarkers}
+            anchors={anchorMarkers}
+            showPlaces={showPlacesLayer}
+            showAnchors={showAnchorsLayer}
+            selectedPlaceId={selectedPlaceId}
+            userLocation={userLocation}
+            userLocationLabel={t("map.currentLocation")}
+            onSelectPlace={setSelectedPlaceId}
+          />
+        )}
       </div>
-      <p className="text-xs text-text-muted">{t("map.schematicNote")}</p>
+      <p className="text-xs text-text-muted">{t("map.realMapNote")}</p>
+
+      {selectedPlace && selectedDistance !== null && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2">
+          <span className="min-w-0 truncate text-sm font-semibold text-text-primary">{selectedPlace.name}</span>
+          <span className="tnum shrink-0 text-xs text-text-secondary">
+            {t("map.walkingEstimate", {
+              distance: formatDistance(selectedDistance),
+              minutes: estimatedWalkingMinutes(selectedDistance),
+            })}
+          </span>
+        </div>
+      )}
 
       {isOffline && syncedAt !== null && (
         <p className="text-xs text-text-muted">

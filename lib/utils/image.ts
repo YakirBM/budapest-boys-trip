@@ -2,11 +2,12 @@
  * lib/utils/image.ts — client-side media pipeline (docs/06-features/07 §Upload pipeline).
  * Browser-only: decode → canvas re-encode → WebP derivative (2048px q≈0.8) +
  * 400px thumbnail (q≈0.7). EXIF/GPS is stripped by construction — the canvas
- * re-encode carries no metadata. Decode failure falls back to the original blob
- * (server-side magic-byte validation + Edge conversion remain the safety net).
+ * re-encode carries no metadata. A decode/encode failure is rejected so an
+ * untouched file (including EXIF/GPS) can never be uploaded accidentally.
  */
 
 export const MAX_INPUT_BYTES = 15 * 1024 * 1024;
+export const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 export const LONG_EDGE = 2048;
 export const THUMB_LONG_EDGE = 400;
 export const DERIVATIVE_QUALITY = 0.8;
@@ -18,13 +19,13 @@ const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp|hei[cf])$/i;
 export interface CompressedImage {
   /** Shared derivative (long edge ≤ 2048, no metadata). */
   blob: Blob;
-  /** 400px thumbnail; equals `blob` in the fallback path. */
+  /** 400px thumbnail; equals `blob` when the source is already thumbnail-sized. */
   thumbBlob: Blob;
   width: number;
   height: number;
-  /** True when decoding failed and the untouched original is returned as-is. */
-  fallback: boolean;
-  /** Actual mime of the derivative ("image/webp", or "image/jpeg"/"image/png" if the browser cannot encode WebP). */
+  /** Kept literal for callers that need to assert the privacy-safe path. */
+  fallback: false;
+  /** Actual mime of the derivative (normally image/webp). */
   mime: string;
 }
 
@@ -102,9 +103,8 @@ function scaledDimensions(width: number, height: number, longEdge: number): {
 
 /**
  * Compress one picked image into the shared WebP derivative + thumbnail.
- * Resolves with `fallback: true` (original blob passthrough) when the file
- * cannot be decoded in this browser — the caller uploads it unchanged and
- * surfaces a warning chip.
+ * Throws when the browser cannot create privacy-safe derivatives. Callers must
+ * surface the error and must not upload the original file.
  */
 export async function compressImage(file: File): Promise<CompressedImage> {
   try {
@@ -119,6 +119,10 @@ export async function compressImage(file: File): Promise<CompressedImage> {
         ? mainBlob
         : await canvasToBlob(drawScaled(source, thumb.width, thumb.height), THUMB_QUALITY);
 
+    if (mainBlob.size <= 0 || mainBlob.size > MAX_OUTPUT_BYTES) {
+      throw new Error("image_derivative_size_invalid");
+    }
+
     if (source instanceof ImageBitmap) source.close();
     return {
       blob: mainBlob,
@@ -128,16 +132,8 @@ export async function compressImage(file: File): Promise<CompressedImage> {
       fallback: false,
       mime: mainBlob.type || "image/webp",
     };
-  } catch {
-    // Fallback: upload the untouched original (≤ 15MB already enforced).
-    return {
-      blob: file,
-      thumbBlob: file,
-      width: 0,
-      height: 0,
-      fallback: true,
-      mime: file.type || "application/octet-stream",
-    };
+  } catch (error) {
+    throw new Error("image_safe_reencode_failed", { cause: error });
   }
 }
 

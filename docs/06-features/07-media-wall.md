@@ -1,7 +1,7 @@
 ---
 id: feature-media-wall
 title: Media Wall — "The Memory Wall"
-status: draft
+status: implemented-partial
 depends_on: [data-model]
 last_updated: 2026-09-11
 ---
@@ -23,7 +23,8 @@ Hard rule: this page is for **group memories only**. Sensitive documents (passpo
 ## User stories
 
 - As a member, I multi-select ~20 photos from my camera roll, tap once, and walk away — compression, thumbnails and upload happen in the background with per-file progress.
-- As a member whose WiFi dropped mid-batch, my uploads resume from the outbox without re-picking files.
+- As a member on a phone, I can select several photos and the app processes at most two concurrently
+  to avoid memory spikes. Offline upload replay remains a future enhancement.
 - As a member, I browse a fast masonry grid filtered by day / uploader / place / tag, open fullscreen, like, and drop a short comment.
 - As an uploader, I can mark any photo private — visible only to me, enforced by RLS.
 - As a member, I tag who appears in a photo so we can filter "everything with Aharon".
@@ -42,7 +43,7 @@ Entry: bottom-nav **More** ("עוד") → "קיר הזיכרונות". Single sc
 │ │ יום 1│ יום 2│ יום 3│ ...   │ │
 │ └─────────────────────────────┘ │
 │ ┌──┐┌──┐┌──┐                   │
-│ │  ││  ││  │  ┌──┐┌──┐        │ ← MediaGrid (masonry 3-col)
+│ │  ││  ││  │  ┌──┐┌──┐        │ ← MediaGrid (2-col narrow / 3-col wider)
 │ │  │└──┘└──┘  │  ││  │        │   infinite scroll
 │ └──┘┌──┐┌──┐  └──┘└──┘        │
 │     │  ││ ⏳ממתין│               │ ← pending badge item (outbox)
@@ -75,14 +76,14 @@ Fullscreen viewer (`MediaViewer`):
 
 | Component | Purpose |
 |---|---|
-| `MediaGrid` | Masonry (3 columns on mobile) of 400px thumbnails; keyset-paginated infinite scroll; renders local pending items inline with badge + progress ring. |
+| `MediaGrid` | Masonry (2 columns on narrow phones, 3 on wider phones) of signed 400px thumbnails; currently capped at 240 rows. |
 | `MediaPicker` | `<input type="file" multiple accept="image/*">`, `capture="environment"` on mobile for direct-camera shots. |
 | `UploadBar` | Sticky bar during uploads: N files, per-file progress, cancel, "X ממתין לסנכרון" state. |
-| `FilterChips` | Day (1–5) · uploader · place · tag · "רק שלי"; combinable. |
+| `FilterChips` | Free search across title/caption/person/place/album/tag plus day, album, place and "רק שלי" filters; combinable. |
 | `MomentBanner` | "רגע היום" featured strip per day (see rules below). |
 | `MediaViewer` | Fullscreen swipe pager, pinch-zoom, info panel (time/place/uploader/tags), like, comments sheet, download, ⋯ menu (edit caption/tags, private toggle, delete). |
 | `CommentsSheet` | Short comments (≤ 280 chars), realtime updates. |
-| `TagEditor` | People tags = member chips (manual only); optional place link via `places` picker. |
+| `TagEditor` | Metadata sheet: title, caption, day, virtual album creation/selection, member chips, place and free tags. |
 | `PrivateBadge` | Lock chip rendered only for the uploader on private items. |
 
 ## Data & queries
@@ -106,6 +107,10 @@ Tables `media_items` and `media_reactions` (canonical definitions live in `docs/
 | `bytes_stored` | int | Compressed size. |
 | `sha256` | text | Of compressed bytes; duplicate-detection key. |
 | `caption` | text | ≤ 200 chars, optional. |
+| `title` | text | Human-editable name, ≤ 120 chars. |
+| `original_filename` | text | Sanitized base filename for search; never a device path. |
+| `album_id` | uuid FK → media_albums, nullable | Virtual folder; changing it does not move objects. |
+| `tags` | text[] | Up to 20 normalized manual tags. |
 | `tagged_member_ids` | uuid[] | People tags. |
 | `place_id` | uuid FK → places, nullable | Optional place link. |
 | `captured_at` | timestamptz, nullable | EXIF time if available, else upload time. |
@@ -248,8 +253,8 @@ People tags are **manual only** — no face recognition or auto-tagging.
 | Case | Behavior |
 |---|---|
 | Duplicate upload | Same `sha256` already `ready` → offer "כבר נמצא בקיר" deep link to the existing item instead of storing a second copy. |
-| Compression fails (decode error / corrupt file) | Fallback: if JPEG/PNG and ≤ 15 MB, upload unchanged with its true MIME + warning chip; generate thumbnail server-side or reuse the main object in the grid. If that fails → `status=failed` with visible retry. |
-| HEIC on desktop browser | Chromium/Firefox cannot decode HEIC in canvas → upload original (server MIME-checked), set `status=needs_conversion`, convert to WebP via Edge Function, then flip to `ready`. If conversion fails: item stays uploader-only with a "טרם הומר" badge. Safari (iOS/macOS) compresses client-side as usual. |
+| Compression fails (decode error / corrupt file) | Reject with a visible privacy-safe error. The untouched original is never uploaded because it may retain EXIF/GPS and consume excess storage. |
+| HEIC on desktop browser | If the browser cannot decode HEIC, reject it with guidance to export JPEG/WebP or upload from Safari. A future private server conversion path may be added after explicit threat/cost review. |
 | Deletion | Soft-delete (`status='deleted'`) → hidden everywhere immediately; scheduled purge job removes objects + thumbnails after a 7-day grace (undo window), then the row per retention policy. |
 | Storage quota hit (1 GB) | Uploads rejected with a clear group-facing message + link to a "largest items" cleanup view. Never fail silently. |
 | Upload interrupted mid-file | Outbox retries the whole object on reconnect — derivatives are ≤ ~300 KB, so full resend beats resumable-upload complexity. |

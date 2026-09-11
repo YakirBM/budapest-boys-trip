@@ -37,14 +37,16 @@ export async function updateSupabaseSession(request: NextRequest): Promise<NextR
 
   // IMPORTANT: do not run code between createServerClient and getSession —
   // the session refresh must complete first.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifies the JWT locally when the project uses asymmetric keys
+  // (the hosted default), avoiding a cross-region Auth request on every route.
+  // It still refreshes through @supabase/ssr when the access token has expired.
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const isAuthenticated = !claimsError && Boolean(claimsData?.claims?.sub);
 
   const { pathname } = request.nextUrl;
   const isAppRoute = !isPublic(pathname) && pathname !== "/";
 
-  if (!user && isAppRoute) {
+  if (!isAuthenticated && isAppRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

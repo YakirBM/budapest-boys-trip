@@ -28,6 +28,12 @@ export interface RegisterMediaItemInput {
   caption: string | null;
   visibility: "group" | "private";
   clientItemId: string;
+  title: string | null;
+  originalFilename: string | null;
+  albumId: string | null;
+  linkedPlaceId: string | null;
+  taggedMemberIds: string[];
+  tags: string[];
 }
 
 export type RegisterMediaResult =
@@ -72,6 +78,12 @@ export async function registerMediaItemAction(
       caption: z.string().max(200).nullable(),
       visibility: z.enum(["group", "private"]),
       clientItemId: z.string().min(8),
+      title: z.string().trim().min(1).max(120).nullable(),
+      originalFilename: z.string().trim().min(1).max(180).nullable(),
+      albumId: z.string().uuid().nullable(),
+      linkedPlaceId: z.string().uuid().nullable(),
+      taggedMemberIds: z.array(z.string().uuid()).max(6),
+      tags: z.array(z.string().trim().min(1).max(32)).max(20),
     })
     .safeParse(input);
   if (!parsed.success) return { ok: false, error: ERR.invalid };
@@ -116,6 +128,12 @@ export async function registerMediaItemAction(
       caption: parsed.data.caption,
       visibility: parsed.data.visibility,
       status: "active",
+      title: parsed.data.title,
+      original_filename: parsed.data.originalFilename,
+      album_id: parsed.data.albumId,
+      linked_place_id: parsed.data.linkedPlaceId,
+      tagged_member_ids: parsed.data.taggedMemberIds,
+      tags: parsed.data.tags,
     })
     .select("id")
     .single();
@@ -126,6 +144,62 @@ export async function registerMediaItemAction(
 
   revalidatePath("/media");
   return { ok: true, id: String(inserted.data["id"]), existing: false };
+}
+
+export interface UpdateMediaMetadataInput {
+  mediaId: string;
+  title: string | null;
+  caption: string | null;
+  dayNumber: number | null;
+  albumId: string | null;
+  linkedPlaceId: string | null;
+  taggedMemberIds: string[];
+  tags: string[];
+}
+
+export async function updateMediaMetadataAction(input: UpdateMediaMetadataInput): Promise<ActionResult> {
+  const parsed = z.object({
+    mediaId: z.string().uuid(),
+    title: z.string().trim().min(1).max(120).nullable(),
+    caption: z.string().trim().max(200).nullable(),
+    dayNumber: z.number().int().min(1).max(5).nullable(),
+    albumId: z.string().uuid().nullable(),
+    linkedPlaceId: z.string().uuid().nullable(),
+    taggedMemberIds: z.array(z.string().uuid()).max(6),
+    tags: z.array(z.string().trim().min(1).max(32)).max(20),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, error: ERR.invalid };
+  const supabase = await getSupabaseServerClient();
+  const user = (await supabase.auth.getClaims()).data?.claims?.sub;
+  if (typeof user !== "string") return { ok: false, error: ERR.forbidden };
+  const updated = await supabase.from("media_items").update({
+    title: parsed.data.title,
+    caption: parsed.data.caption,
+    day_number: parsed.data.dayNumber,
+    album_id: parsed.data.albumId,
+    linked_place_id: parsed.data.linkedPlaceId,
+    tagged_member_ids: parsed.data.taggedMemberIds,
+    tags: [...new Set(parsed.data.tags.map((tag) => tag.toLocaleLowerCase("he-IL")))],
+  }).eq("id", parsed.data.mediaId).eq("uploader_id", user).select("id").maybeSingle();
+  if (updated.error || !updated.data) return { ok: false, error: ERR.forbidden };
+  revalidatePath("/media");
+  return { ok: true };
+}
+
+export async function createMediaAlbumAction(name: string): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const parsed = z.string().trim().min(1).max(80).safeParse(name);
+  if (!parsed.success) return { ok: false, error: ERR.invalid };
+  const supabase = await getSupabaseServerClient();
+  const user = (await supabase.auth.getClaims()).data?.claims?.sub;
+  if (typeof user !== "string") return { ok: false, error: ERR.forbidden };
+  const inserted = await supabase.from("media_albums").insert({
+    trip_id: TRIP_ID,
+    name: parsed.data,
+    created_by: user,
+  }).select("id").single();
+  if (inserted.error) return { ok: false, error: ERR.invalid };
+  revalidatePath("/media");
+  return { ok: true, id: String(inserted.data.id) };
 }
 
 /** Soft delete — uploader or trip owner only (RLS-verified server-side). */

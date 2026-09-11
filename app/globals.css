@@ -266,6 +266,50 @@
   animation: fade-in 200ms ease-out both;
 }
 
+/* Interactive map markers. Geographic positioning is owned by MapLibre and is
+   intentionally direction-neutral even though the surrounding UI is RTL. */
+.real-map-marker {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 2px solid var(--c-surface);
+  border-radius: 9999px;
+  background: var(--c-info);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 28%);
+  cursor: pointer;
+}
+
+.real-map-marker[data-selected="true"] {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: var(--c-brand);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c-brand) 25%, transparent);
+}
+
+.real-map-marker--anchor {
+  background: var(--c-warning);
+  color: #fff;
+}
+
+.real-map-user-marker {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 3px solid #fff;
+  border-radius: 9999px;
+  background: #2563eb;
+  box-shadow: 0 0 0 6px rgb(37 99 235 / 22%);
+}
+
+.maplibregl-ctrl-attrib {
+  direction: ltr;
+  font-size: 10px;
+}
+
 /* TimeBlock "now" state — brand border pulse. */
 @utility pulse-brand {
   animation: brand-pulse 1.6s ease-in-out infinite;

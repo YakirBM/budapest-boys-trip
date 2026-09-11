@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, Heart, Lock, Loader2, Star, Trash2 } from "lucide-react";
+import { Camera, FolderPlus, Heart, Lock, Loader2, Pencil, Search, Star, Trash2 } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +13,20 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { cacheSnapshot, readSnapshot } from "@/lib/offline/db";
 import {
   addMediaCommentAction,
+  createMediaAlbumAction,
   registerMediaItemAction,
   setMediaVisibilityAction,
   softDeleteMediaAction,
   toggleMediaLikeAction,
+  updateMediaMetadataAction,
 } from "@/lib/actions/media";
-import type { MediaBoard, MediaItemRow, MediaReactionRow } from "@/lib/data/media";
+import type {
+  MediaAlbumRow,
+  MediaBoard,
+  MediaItemRow,
+  MediaPlaceRow,
+  MediaReactionRow,
+} from "@/lib/data/media";
 import type { TripMember } from "@/lib/data/trip";
 import { compressImage, isAllowedImageFile, sha256Hex, MAX_INPUT_BYTES } from "@/lib/utils/image";
 import { getSignedUrls, peekSignedUrl } from "./signedUrlCache";
@@ -36,6 +44,8 @@ export interface MediaViewProps {
 interface MediaPayload {
   items: MediaItemRow[];
   reactions: MediaReactionRow[];
+  albums: MediaAlbumRow[];
+  places: MediaPlaceRow[];
   stale: boolean;
 }
 
@@ -51,16 +61,22 @@ const MEDIA_CACHE_KEY = "media";
 async function fetchMedia(tripId: string): Promise<MediaPayload> {
   const supabase = getSupabaseBrowserClient();
   try {
-    const itemsRes = await supabase
-      .from("media_items")
-      .select(
-        "id,uploader_id,storage_path,thumbnail_path,width,height,day_number,caption,visibility,is_moment_of_day,uploaded_at,size_bytes,mime_stored",
-      )
-      .eq("trip_id", tripId)
-      .eq("status", "active")
-      .order("uploaded_at", { ascending: false })
-      .limit(240);
+    const [itemsRes, albumsRes, placesRes] = await Promise.all([
+      supabase
+        .from("media_items")
+        .select(
+          "id,uploader_id,storage_path,thumbnail_path,width,height,day_number,caption,visibility,is_moment_of_day,uploaded_at,size_bytes,mime_stored,title,original_filename,album_id,linked_place_id,tagged_member_ids,tags",
+        )
+        .eq("trip_id", tripId)
+        .eq("status", "active")
+        .order("uploaded_at", { ascending: false })
+        .limit(240),
+      supabase.from("media_albums").select("id,name,description,created_by").eq("trip_id", tripId).order("name"),
+      supabase.from("places").select("id,name").eq("trip_id", tripId).neq("status", "rejected").order("name"),
+    ]);
     if (itemsRes.error) throw itemsRes.error;
+    if (albumsRes.error) throw albumsRes.error;
+    if (placesRes.error) throw placesRes.error;
     const items = ((itemsRes.data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
       id: String(row["id"]),
       uploader_id: String(row["uploader_id"]),
@@ -75,6 +91,14 @@ async function fetchMedia(tripId: string): Promise<MediaPayload> {
       uploaded_at: String(row["uploaded_at"]),
       size_bytes: row["size_bytes"] === null ? null : Number(row["size_bytes"]),
       mime_stored: String(row["mime_stored"] ?? "image/webp"),
+      title: row["title"] === null ? null : String(row["title"]),
+      original_filename: row["original_filename"] === null ? null : String(row["original_filename"]),
+      album_id: row["album_id"] === null ? null : String(row["album_id"]),
+      linked_place_id: row["linked_place_id"] === null ? null : String(row["linked_place_id"]),
+      tagged_member_ids: Array.isArray(row["tagged_member_ids"])
+        ? row["tagged_member_ids"].map(String)
+        : [],
+      tags: Array.isArray(row["tags"]) ? row["tags"].map(String) : [],
     }));
     const itemIds = items.map((i) => i.id);
     const reactionsRes =
@@ -98,9 +122,21 @@ async function fetchMedia(tripId: string): Promise<MediaPayload> {
         body: row["body"] === null ? null : String(row["body"]),
         created_at: String(row["created_at"]),
       })),
+      albums: (albumsRes.data ?? []).map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+        description: row.description === null ? null : String(row.description),
+        created_by: String(row.created_by),
+      })),
+      places: (placesRes.data ?? []).map((row) => ({ id: String(row.id), name: String(row.name) })),
       stale: false,
     };
-    await cacheSnapshot(MEDIA_CACHE_KEY, { items: payload.items, reactions: payload.reactions });
+    await cacheSnapshot(MEDIA_CACHE_KEY, {
+      items: payload.items,
+      reactions: payload.reactions,
+      albums: payload.albums,
+      places: payload.places,
+    });
     return payload;
   } catch (err) {
     const snap = await readSnapshot<Omit<MediaPayload, "stale">>(MEDIA_CACHE_KEY);
@@ -153,19 +189,6 @@ function ThumbImage({
   );
 }
 
-/** True mime for fallback (unprocessed) uploads — derived from the real file, never guessed data. */
-function fallbackStoredMime(file: File): "image/jpeg" | "image/png" | "image/webp" | "image/heic" {
-  const type = file.type.toLowerCase();
-  if (type === "image/jpeg" || type === "image/png" || type === "image/webp" || type === "image/heic") {
-    return type;
-  }
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".png")) return "image/png";
-  if (name.endsWith(".webp")) return "image/webp";
-  if (name.endsWith(".heic") || name.endsWith(".heif")) return "image/heic";
-  return "image/jpeg";
-}
-
 /**
  * Media wall (docs/06-features/07): masonry grid of signed-URL thumbnails,
  * day/uploader filters, an online-only upload pipeline (client WebP compress →
@@ -177,15 +200,25 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MediaItemRow | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editTarget, setEditTarget] = useState<MediaItemRow | null>(null);
   const [dayFilter, setDayFilter] = useState<number | null>(null);
   const [mineOnly, setMineOnly] = useState(false);
+  const [albumFilter, setAlbumFilter] = useState("");
+  const [placeFilter, setPlaceFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [uploads, setUploads] = useState<UploadTile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mediaQ = useQuery({
     queryKey: ["media", tripId],
     queryFn: () => fetchMedia(tripId),
-    initialData: { items: initial.items, reactions: initial.reactions, stale: false },
+    initialData: {
+      items: initial.items,
+      reactions: initial.reactions,
+      albums: initial.albums,
+      places: initial.places,
+      stale: false,
+    },
   });
 
   const nameOf = useMemo(() => new Map(members.map((m) => [m.user_id, m.full_name])), [members]);
@@ -208,15 +241,30 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
     return map;
   }, [mediaQ.data.reactions]);
 
-  const filtered = useMemo(
-    () =>
-      mediaQ.data.items.filter(
-        (i) =>
-          (dayFilter === null || i.day_number === dayFilter) &&
-          (!mineOnly || i.uploader_id === userId),
-      ),
-    [mediaQ.data.items, dayFilter, mineOnly, userId],
-  );
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase("he-IL");
+    return mediaQ.data.items.filter((item) => {
+      const searchable = [
+        item.title,
+        item.caption,
+        item.original_filename,
+        ...item.tags,
+        ...item.tagged_member_ids.map((id) => nameOf.get(id) ?? ""),
+        mediaQ.data.albums.find((album) => album.id === item.album_id)?.name,
+        mediaQ.data.places.find((place) => place.id === item.linked_place_id)?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("he-IL");
+      return (
+        (dayFilter === null || item.day_number === dayFilter) &&
+        (!mineOnly || item.uploader_id === userId) &&
+        (albumFilter === "" || item.album_id === albumFilter) &&
+        (placeFilter === "" || item.linked_place_id === placeFilter) &&
+        (needle === "" || searchable.includes(needle))
+      );
+    });
+  }, [albumFilter, dayFilter, mediaQ.data.albums, mediaQ.data.items, mediaQ.data.places, mineOnly, nameOf, placeFilter, search, userId]);
 
   const viewer = viewerId !== null ? mediaQ.data.items.find((i) => i.id === viewerId) ?? null : null;
 
@@ -231,6 +279,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
   async function uploadOne(file: File, key: string): Promise<void> {
     const setStatus = (status: UploadTile["status"]): void =>
       setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, status } : u)));
+    const uploadedPaths: string[] = [];
     try {
       if (file.size > MAX_INPUT_BYTES) {
         pushToast({ message: t("media.fileTooLarge", { name: file.name }), type: "danger" });
@@ -244,21 +293,10 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       }
 
       const comp = await compressImage(file);
-      if (comp.fallback) {
-        pushToast({ message: t("media.compressionFallback", { name: file.name }), type: "info" });
-      }
-      const storedMime = comp.fallback ? fallbackStoredMime(file) : "image/webp";
+      const storedMime = "image/webp" as const;
       const sha = await sha256Hex(comp.blob);
       const uuid = crypto.randomUUID();
-      const ext =
-        storedMime === "image/jpeg"
-          ? "jpg"
-          : storedMime === "image/png"
-            ? "png"
-            : storedMime === "image/heic"
-              ? "heic"
-              : "webp";
-      const mainPath = `trips/${tripId}/media/${userId}/${uuid}.${ext}`;
+      const mainPath = `trips/${tripId}/media/${userId}/${uuid}.webp`;
       const thumbBlobIsWebp = comp.thumbBlob !== comp.blob && comp.thumbBlob.type === "image/webp";
       const thumbPath = thumbBlobIsWebp ? `trips/${tripId}/thumbnails/${userId}/${uuid}.webp` : mainPath;
 
@@ -268,12 +306,14 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         cacheControl: "31536000",
       });
       if (mainUp.error) throw mainUp.error;
+      uploadedPaths.push(mainPath);
       if (thumbBlobIsWebp) {
         const thumbUp = await storage.upload(thumbPath, comp.thumbBlob, {
           contentType: "image/webp",
           cacheControl: "31536000",
         });
         if (thumbUp.error) throw thumbUp.error;
+        uploadedPaths.push(thumbPath);
       }
 
       const reg = await registerMediaItemAction({
@@ -290,6 +330,12 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         caption: null,
         visibility: "group",
         clientItemId: uuid,
+        title: file.name.replace(/\.[^.]+$/, "").trim().slice(0, 120) || null,
+        originalFilename: file.name.trim().slice(0, 180) || null,
+        albumId: null,
+        linkedPlaceId: null,
+        taggedMemberIds: [],
+        tags: [],
       });
       if (!reg.ok) throw new Error(reg.error);
 
@@ -297,8 +343,18 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       void queryClient.invalidateQueries({ queryKey: ["media", tripId] });
     } catch (err) {
       console.error("media upload failed", err);
+      if (uploadedPaths.length > 0) {
+        const cleanup = await getSupabaseBrowserClient().storage.from("trip-media").remove(uploadedPaths);
+        if (cleanup.error) console.error("media upload cleanup failed", cleanup.error.message);
+      }
       setStatus("failed");
-      pushToast({ message: t("media.uploadFailed"), type: "danger" });
+      pushToast({
+        message:
+          err instanceof Error && err.message === "image_safe_reencode_failed"
+            ? t("media.compressionFailed", { name: file.name })
+            : t("media.uploadFailed"),
+        type: "danger",
+      });
     }
   }
 
@@ -317,7 +373,15 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       status: "uploading" as const,
     }));
     setUploads((prev) => [...tiles, ...prev]);
-    void Promise.all(tiles.map((tile, index) => uploadOne(list[index]!, tile.key)));
+    // Two workers avoid memory spikes when several 15MB phone photos are picked.
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      while (nextIndex < list.length) {
+        const index = nextIndex++;
+        await uploadOne(list[index]!, tiles[index]!.key);
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(2, list.length) }, () => worker()));
   }
 
   function toggleLike(item: MediaItemRow): void {
@@ -472,6 +536,41 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       )}
 
       {/* Filters */}
+      <div className="mb-3 grid grid-cols-2 gap-2">
+        <label className="relative col-span-2">
+          <Search aria-hidden size={18} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <span className="sr-only">{t("media.searchLabel")}</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("media.searchPlaceholder")}
+            className="min-h-12 w-full rounded-xl border border-border bg-surface-raised pe-3 ps-10 text-sm text-text-primary outline-none focus:border-brand"
+          />
+        </label>
+        <label>
+          <span className="sr-only">{t("media.albumFilter")}</span>
+          <select
+            value={albumFilter}
+            onChange={(event) => setAlbumFilter(event.target.value)}
+            className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
+          >
+            <option value="">{t("media.allAlbums")}</option>
+            {mediaQ.data.albums.map((album) => <option key={album.id} value={album.id}>{album.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="sr-only">{t("media.placeFilter")}</span>
+          <select
+            value={placeFilter}
+            onChange={(event) => setPlaceFilter(event.target.value)}
+            className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-secondary"
+          >
+            <option value="">{t("media.allPlaces")}</option>
+            {mediaQ.data.places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+          </select>
+        </label>
+      </div>
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -518,20 +617,20 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       {filtered.length === 0 ? (
         <EmptyState illustration="media" title={t("media.empty")} hint={t("media.emptyHint")} />
       ) : (
-        <div className="columns-3 gap-2">
+        <div className="columns-2 gap-2 min-[430px]:columns-3">
           {filtered.map((item) => (
             <button
               key={item.id}
               type="button"
               onClick={() => setViewerId(item.id)}
-              aria-label={item.caption ?? t("media.title")}
+              aria-label={item.title ?? item.caption ?? t("media.title")}
               className="relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-lg border border-border bg-surface-raised text-start active:opacity-80"
             >
               <ThumbImage
                 path={item.thumbnail_path ?? item.storage_path}
                 width={item.width}
                 height={item.height}
-                alt={item.caption ?? t("media.title")}
+                alt={item.title ?? item.caption ?? t("media.title")}
               />
               {item.is_moment_of_day && (
                 <span aria-label={t("media.dayLabel", { day: item.day_number ?? 0 })} className="absolute top-1 end-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-warning/90 text-white">
@@ -558,7 +657,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
       <BottomSheet
         open={viewer !== null}
         onClose={() => setViewerId(null)}
-        title={viewer?.day_number === null || viewer === null ? t("media.title") : t("media.dayLabel", { day: viewer.day_number })}
+        title={viewer?.title ?? (viewer?.day_number === null || viewer === null ? t("media.title") : t("media.dayLabel", { day: viewer.day_number }))}
       >
         {viewer && (
           <div className="flex flex-col gap-3 pb-4">
@@ -567,7 +666,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
                 path={viewer.storage_path}
                 width={viewer.width}
                 height={viewer.height}
-                alt={viewer.caption ?? t("media.title")}
+                alt={viewer.title ?? viewer.caption ?? t("media.title")}
               />
             </div>
 
@@ -580,6 +679,14 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
                 {viewer.visibility === "private" && ` · ${t("media.privateBadge")}`}
               </span>
               {viewer.caption && <p className="text-sm text-text-secondary">{viewer.caption}</p>}
+              {(viewer.album_id || viewer.linked_place_id || viewer.tags.length > 0 || viewer.tagged_member_ids.length > 0) && (
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-text-muted">
+                  {viewer.album_id && <span className="rounded-full bg-brand-soft px-2 py-1">{mediaQ.data.albums.find((album) => album.id === viewer.album_id)?.name}</span>}
+                  {viewer.linked_place_id && <span className="rounded-full bg-brand-soft px-2 py-1">{mediaQ.data.places.find((place) => place.id === viewer.linked_place_id)?.name}</span>}
+                  {viewer.tagged_member_ids.map((id) => <span key={id} className="rounded-full bg-surface px-2 py-1">{nameOf.get(id)}</span>)}
+                  {viewer.tags.map((tag) => <span key={tag} className="rounded-full bg-surface px-2 py-1">#{tag}</span>)}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -602,6 +709,17 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
               </button>
               {viewer.uploader_id === userId && (
                 <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewerId(null);
+                      setEditTarget(viewer);
+                    }}
+                    className="inline-flex min-h-12 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-text-secondary"
+                  >
+                    <Pencil aria-hidden size={16} />
+                    {t("media.editMetadata")}
+                  </button>
                   <button
                     type="button"
                     onClick={() => togglePrivate(viewer)}
@@ -632,6 +750,24 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         )}
       </BottomSheet>
 
+      <MediaEditSheet
+        key={editTarget?.id ?? "closed"}
+        item={editTarget}
+        albums={mediaQ.data.albums}
+        places={mediaQ.data.places}
+        members={members}
+        onClose={() => setEditTarget(null)}
+        onSaved={(updated) => {
+          patchCache(updated.id, () => updated);
+          setEditTarget(null);
+        }}
+        onAlbumCreated={(album) => {
+          queryClient.setQueryData<MediaPayload>(["media", tripId], (old) =>
+            old ? { ...old, albums: [...old.albums, album].sort((a, b) => a.name.localeCompare(b.name, "he")) } : old,
+          );
+        }}
+      />
+
       <ConfirmSheet
         open={deleteTarget !== null}
         onClose={() => setDeleteTarget(null)}
@@ -642,6 +778,164 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         confirmLabel={t("common.delete")}
       />
     </>
+  );
+}
+
+function MediaEditSheet({
+  item,
+  albums,
+  places,
+  members,
+  onClose,
+  onSaved,
+  onAlbumCreated,
+}: {
+  item: MediaItemRow | null;
+  albums: MediaAlbumRow[];
+  places: MediaPlaceRow[];
+  members: TripMember[];
+  onClose: () => void;
+  onSaved: (item: MediaItemRow) => void;
+  onAlbumCreated: (album: MediaAlbumRow) => void;
+}) {
+  const [title, setTitle] = useState(item?.title ?? "");
+  const [caption, setCaption] = useState(item?.caption ?? "");
+  const [day, setDay] = useState(item?.day_number?.toString() ?? "");
+  const [albumId, setAlbumId] = useState(item?.album_id ?? "");
+  const [placeId, setPlaceId] = useState(item?.linked_place_id ?? "");
+  const [tagged, setTagged] = useState<string[]>(item?.tagged_member_ids ?? []);
+  const [tags, setTags] = useState(item?.tags.join(", ") ?? "");
+  const [newAlbum, setNewAlbum] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [creatingAlbum, setCreatingAlbum] = useState(false);
+
+  async function createAlbum(): Promise<void> {
+    if (!item || newAlbum.trim() === "") return;
+    setCreatingAlbum(true);
+    const result = await createMediaAlbumAction(newAlbum);
+    setCreatingAlbum(false);
+    if (!result.ok) {
+      pushToast({ message: t("media.errors.albumCreate"), type: "danger" });
+      return;
+    }
+    const album = { id: result.id, name: newAlbum.trim(), description: null, created_by: item.uploader_id };
+    onAlbumCreated(album);
+    setAlbumId(result.id);
+    setNewAlbum("");
+    pushToast({ message: t("media.albumCreated"), type: "success" });
+  }
+
+  async function save(): Promise<void> {
+    if (!item) return;
+    const normalizedTags = [...new Set(tags.split(/[,#]/).map((tag) => tag.trim()).filter(Boolean))].slice(0, 20);
+    setSaving(true);
+    const result = await updateMediaMetadataAction({
+      mediaId: item.id,
+      title: title.trim() || null,
+      caption: caption.trim() || null,
+      dayNumber: day === "" ? null : Number(day),
+      albumId: albumId || null,
+      linkedPlaceId: placeId || null,
+      taggedMemberIds: tagged,
+      tags: normalizedTags,
+    });
+    setSaving(false);
+    if (!result.ok) {
+      pushToast({ message: t("media.errors.metadataSave"), type: "danger" });
+      return;
+    }
+    onSaved({
+      ...item,
+      title: title.trim() || null,
+      caption: caption.trim() || null,
+      day_number: day === "" ? null : Number(day),
+      album_id: albumId || null,
+      linked_place_id: placeId || null,
+      tagged_member_ids: tagged,
+      tags: normalizedTags.map((tag) => tag.toLocaleLowerCase("he-IL")),
+    });
+    pushToast({ message: t("media.metadataSaved"), type: "success" });
+  }
+
+  const fieldClass = "min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none focus:border-brand";
+
+  return (
+    <BottomSheet open={item !== null} onClose={onClose} title={t("media.editMetadata")}>
+      {item && (
+        <form
+          className="flex flex-col gap-3 pb-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save();
+          }}
+        >
+          <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+            {t("media.titleLabel")}
+            <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} className={fieldClass} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+            {t("media.captionLabel")}
+            <textarea value={caption} onChange={(event) => setCaption(event.target.value)} maxLength={200} rows={3} className={`${fieldClass} py-3`} />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex min-w-0 flex-col gap-1 text-sm font-semibold text-text-secondary">
+              {t("media.dayField")}
+              <select value={day} onChange={(event) => setDay(event.target.value)} className={fieldClass}>
+                <option value="">{t("media.noDay")}</option>
+                {[1, 2, 3, 4, 5].map((number) => <option key={number} value={number}>{t("media.filterDay", { day: number })}</option>)}
+              </select>
+            </label>
+            <label className="flex min-w-0 flex-col gap-1 text-sm font-semibold text-text-secondary">
+              {t("media.placeField")}
+              <select value={placeId} onChange={(event) => setPlaceId(event.target.value)} className={fieldClass}>
+                <option value="">{t("media.noPlace")}</option>
+                {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+            {t("media.albumField")}
+            <select value={albumId} onChange={(event) => setAlbumId(event.target.value)} className={fieldClass}>
+              <option value="">{t("media.noAlbum")}</option>
+              {albums.map((album) => <option key={album.id} value={album.id}>{album.name}</option>)}
+            </select>
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={newAlbum}
+              onChange={(event) => setNewAlbum(event.target.value)}
+              maxLength={80}
+              placeholder={t("media.newAlbumPlaceholder")}
+              aria-label={t("media.newAlbumPlaceholder")}
+              className={`${fieldClass} min-w-0 flex-1`}
+            />
+            <Button type="button" variant="secondary" loading={creatingAlbum} disabled={newAlbum.trim() === ""} onClick={() => void createAlbum()} icon={<FolderPlus size={18} />}>
+              {t("media.createAlbum")}
+            </Button>
+          </div>
+          <fieldset className="rounded-xl border border-border p-3">
+            <legend className="px-1 text-sm font-semibold text-text-secondary">{t("media.peopleField")}</legend>
+            <div className="grid grid-cols-2 gap-2">
+              {members.map((member) => (
+                <label key={member.user_id} className="flex min-h-12 items-center gap-2 rounded-lg bg-surface px-2 text-sm text-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={tagged.includes(member.user_id)}
+                    onChange={(event) => setTagged((current) => event.target.checked ? [...current, member.user_id] : current.filter((id) => id !== member.user_id))}
+                  />
+                  <span className="truncate">{member.full_name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <label className="flex flex-col gap-1 text-sm font-semibold text-text-secondary">
+            {t("media.tagsField")}
+            <input value={tags} onChange={(event) => setTags(event.target.value)} maxLength={660} placeholder={t("media.tagsPlaceholder")} className={fieldClass} />
+          </label>
+          <Button type="submit" block loading={saving}>{t("common.save")}</Button>
+        </form>
+      )}
+    </BottomSheet>
   );
 }
 

@@ -1,12 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * RSC / server-action client. Session lives in cookies (@supabase/ssr).
  * Publishable key only — every query is RLS-scoped.
  */
-export async function getSupabaseServerClient(): Promise<SupabaseClient> {
+export const getSupabaseServerClient = cache(async (): Promise<SupabaseClient> => {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -29,4 +30,4 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient> {
       },
     },
   );
-}
+});

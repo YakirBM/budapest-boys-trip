@@ -39,13 +39,36 @@
     "requiresConnection": "העלאת תמונות דורשת חיבור לאינטרנט",
     "fileTooLarge": "{name}: הקובץ גדול מ־15MB",
     "fileUnsupported": "{name}: סוג קובץ לא נתמך — תמונות בלבד",
-    "compressionFallback": "{name}: לא ניתן לעבד — יועלה כמקורי",
+    "compressionFailed": "{name}: הדפדפן לא הצליח לכווץ ולהסיר מידע פרטי — הקובץ לא הועלה",
+    "searchLabel": "חיפוש במדיה",
+    "searchPlaceholder": "חיפוש לפי שם, אדם, מקום או תגית",
+    "albumFilter": "סינון לפי אלבום",
+    "placeFilter": "סינון לפי מקום",
+    "allAlbums": "כל האלבומים",
+    "allPlaces": "כל המקומות",
+    "editMetadata": "עריכת פרטים",
+    "titleLabel": "שם התמונה",
+    "captionLabel": "תיאור",
+    "dayField": "יום בטיול",
+    "placeField": "מקום",
+    "albumField": "אלבום",
+    "peopleField": "אנשים בתמונה",
+    "tagsField": "תגיות",
+    "tagsPlaceholder": "אוכל, לילה, מצחיק — מופרד בפסיקים",
+    "noPlace": "ללא מקום",
+    "noAlbum": "ללא אלבום",
+    "newAlbumPlaceholder": "שם אלבום חדש",
+    "createAlbum": "יצירה",
+    "albumCreated": "האלבום נוצר",
+    "metadataSaved": "פרטי התמונה נשמרו",
     "signedNote": "התמונות נפתחות בקישורים חתומים זמניים בלבד",
     "errors": {
       "generic": "הפעולה נכשלה — נסו שוב",
       "forbidden": "אין הרשאה לביצוע הפעולה",
       "notFound": "התמונה לא נמצאה",
-      "commentTooLong": "התגובה ארוכה מדי (280 תווים לכל היותר)"
+      "commentTooLong": "התגובה ארוכה מדי (280 תווים לכל היותר)",
+      "albumCreate": "לא ניתן ליצור את האלבום",
+      "metadataSave": "לא ניתן לשמור את פרטי התמונה"
     }
   }
 }

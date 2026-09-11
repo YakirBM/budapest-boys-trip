@@ -52,6 +52,7 @@ All planning docs live in `docs/` and are written in **English**. The app UI is 
 | `docs/10-implementation-roadmap.md` | Build order, milestones, task list with dependencies |
 | `docs/11-acceptance-criteria.md` | Definition of done per feature + perf/security budgets |
 | `docs/12-troubleshooting.md` | Known issues (Supabase 401, storage RLS, PWA install, sync conflicts) |
+| `docs/13-production-hardening-and-feature-upgrade.md` | Approved execution plan, checkpoints, and agent handoff for the production upgrade |
 
 ## Hard rules for agents
 
