@@ -27,3 +27,13 @@ test-results
 shots/
 
 .vercel
+
+# scratch
+*.tmp.json
+*.tmp.txt
+*.tmp.html
+today.tmp.html
+jar.tmp.txt
+al2.json
+dev.log
+tmp/
