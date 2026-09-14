@@ -111,7 +111,9 @@ security advisor now reports no error-level findings. The profile editor now
 uses the explicit, argument-free `get_my_private_profile()` RPC introduced by
 `20260914105540_profile_private_rpc.sql`. It always filters by `auth.uid()` and
 allows the temporary broad table grant to be removed immediately after the new
-frontend is live.
+frontend is live. After production build `b8d50a6` was verified on the stable
+domain, `20260914110335_finalize_profile_private_grants.sql` removed that grant
+and revoked client access to the superseded compatibility view.
 
 Video upload is intentionally not represented as "complete" yet. The requested
 compression needs a bounded server-side transcoding pipeline (format allowlist,

@@ -239,5 +239,6 @@ Final state: **12/12 authenticated pages render on production (today/route/map/m
   now return zero error-level findings.
 - Deployment coordination adds `get_my_private_profile()` as a self-only RPC
   (`20260914105540_profile_private_rpc.sql`). The new ProfileMenu reads the RPC;
-  the compatibility-wide `profiles` SELECT grant is removed only after this
-  frontend revision is confirmed live.
+  after frontend revision `b8d50a6` was confirmed live,
+  `20260914110335_finalize_profile_private_grants.sql` removed the broad
+  compatibility grant and revoked access to the superseded view.
