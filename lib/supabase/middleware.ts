@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/offline", "/icons", "/manifest.webmanifest", "/sw.js", "/sw-manifest.js", "/theme-init.js", "/api/cron"];
+// API handlers perform their own authentication and must be allowed to return
+// JSON 401/4xx responses. Redirecting a POST to /login preserves the method and
+// turns a useful auth error into a misleading 405 from the page route.
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/offline", "/icons", "/manifest.webmanifest", "/sw.js", "/sw-manifest.js", "/theme-init.js", "/api/cron", "/api/scrape", "/api/geocode", "/api/trip-search"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

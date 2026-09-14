@@ -76,6 +76,7 @@
       "timeRequired": "חובה למלא שעת התחלה",
       "titleRequired": "חובה למלא שם",
       "addressRequired": "חובה למלא כתובת",
+      "invalidNumber": "בדקו שהמחיר והקואורדינטות הם מספרים תקינים",
       "reasonRequired": "חובה לציין סיבת פסילה",
       "placeScheduled": "לא אפשר לפסול מקום משובץ",
       "addFailed": "השיבוץ נכשל",
@@ -106,6 +107,8 @@
     },
     "detail": {
       "hours": "שעות פתיחה",
+      "address": "כתובת",
+      "phone": "טלפון",
       "links": "קישורים",
       "mapPreview": "פתח במפות",
       "status": "סטטוס",
@@ -124,6 +127,7 @@
       "fieldMapsUrl": "קישור מפות או אתר",
       "fieldDistrict": "רובע",
       "fieldAddress": "כתובת",
+      "fieldPhone": "טלפון המקום",
       "fieldLat": "קו רוחב",
       "fieldLng": "קו אורך",
       "pickOnMap": "בחר במפה",
@@ -136,11 +140,37 @@
       "fieldReservation": "נדרשת הזמנה",
       "fieldNote": "הערה",
       "fieldCover": "תמונת כיסוי",
+      "coverPreview": "תצוגה מקדימה של תמונת הכיסוי",
       "fetchFromLink": "משוך מקישור",
       "fetchFailed": "לא נמצא מידע בקישור — מלאו ידנית",
+      "fetchSuccess": "הפרטים שנמצאו מולאו בטופס",
+      "sourceLabel": "מקור השליפה",
+      "verifiedLabel": "זמן השליפה",
+      "priceHintLabel": "רמת מחיר מהמקור (אינה סכום)",
       "save": "שמור מקום",
       "saved": "המקום נשמר",
-      "confirmHint": "בדקו את השדות לפני שמירה — מחירים ושעות הם הערכה"
+      "confirmHint": "בדקו את השדות לפני שמירה — מחירים ושעות הם הערכה",
+      "types": {
+        "restaurant": "מסעדה",
+        "bar": "בר או מועדון",
+        "cafe": "בית קפה",
+        "attraction": "אטרקציה או מוזיאון",
+        "viewpoint": "תצפית",
+        "bath": "מרחצאות",
+        "shopping": "קניות",
+        "airport": "נמל תעופה",
+        "transit_hub": "מרכז תחבורה",
+        "bus_stop": "תחנת אוטובוס",
+        "emergency": "מוקד חירום",
+        "meeting_point": "נקודת מפגש",
+        "other": "אחר"
+      },
+      "tags": {
+        "kosher": "כשר",
+        "outdoor": "בחוץ",
+        "rain-backup": "גיבוי לגשם",
+        "verify-hours": "דורש אימות שעות"
+      }
     }
   }
 }

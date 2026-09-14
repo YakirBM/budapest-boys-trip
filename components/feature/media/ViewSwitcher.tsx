@@ -39,7 +39,7 @@ export function ViewSwitcher({
     <div
       role="tablist"
       aria-label={t("media.viewLabel")}
-      className="sticky top-2 z-30 mb-3 flex gap-1.5 overflow-x-auto rounded-2xl border border-border bg-background/95 p-1.5 backdrop-blur"
+      className="scrollbar-none sticky top-[calc(env(safe-area-inset-top,0px)+8rem)] z-20 mb-3 flex gap-1.5 overflow-x-auto rounded-2xl border border-border bg-background/95 p-1.5 backdrop-blur"
     >
       {MEDIA_WALL_VIEWS.map((mode) => {
         const Icon = VIEW_ICONS[mode];

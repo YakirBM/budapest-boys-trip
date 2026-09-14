@@ -119,14 +119,18 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
   // Reconnect: after the outbox flushes, attach parked split plans, then refresh.
   useOutboxSync((pending) => {
     if (pending === 0) {
-      void reconcileExpenseSplits().then(refresh);
+      void reconcileExpenseSplits().then(refresh).catch((error: unknown) => {
+        console.error("expense split reconciliation failed", error);
+      });
     }
   });
   useEffect(() => {
     if (reconciledOnce.current) return;
     reconciledOnce.current = true;
     if (typeof navigator !== "undefined" && navigator.onLine) {
-      void reconcileExpenseSplits().then(refresh);
+      void reconcileExpenseSplits().then(refresh).catch((error: unknown) => {
+        console.error("expense split reconciliation failed", error);
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -502,7 +506,7 @@ export function MoneyView({ tripId, initial, members, userId, isOwner, defaultDa
                     return (
                       <li
                         key={e.id}
-                        className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-xl border border-border bg-surface p-3 min-[380px]:grid-cols-[auto_minmax(0,1fr)_auto]"
+                        className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 rounded-xl border border-border bg-surface p-3 [content-visibility:auto] [contain-intrinsic-size:auto_7rem] min-[380px]:grid-cols-[auto_minmax(0,1fr)_auto]"
                       >
                         <ExpenseCategoryIcon category={e.category} size={36} />
                         <div className="min-w-0 flex-1">

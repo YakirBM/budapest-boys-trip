@@ -201,6 +201,8 @@ Two Vercel cron handlers, daily 05:00 (Vercel schedule is UTC — source: Vercel
 | `NEXT_PUBLIC_SUPABASE_URL` | client + server | `https://zgvpchdqudheiohlrrvm.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | client | RLS-enforced; **currently returns 401 on `/rest/v1/`** — verify/rotate per [12-troubleshooting.md](12-troubleshooting.md) |
 | `CRON_SECRET` | server only | bearer check in cron handlers |
+| `OPENAI_API_KEY` | server only | Responses API credential for `/api/trip-search`; never exposed to the client |
+| `OPENAI_SEARCH_MODEL` | server only | Optional model override; defaults to `gpt-5-mini` |
 
 - Keep secrets in `.env.local` (gitignored) and in Vercel env settings. No other secret may reach the client bundle. Service-role keys are forbidden in this repo.
 - [ ] Verify/rotate the publishable key before first build; re-test `/rest/v1/` returns 200 with anon role.

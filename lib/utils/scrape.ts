@@ -14,9 +14,20 @@ export interface ScrapeResult {
   openingHours: string | null;
   phone: string | null;
   priceHint: string | null;
+  placeType: ScrapedPlaceType | null;
   source: string;
   fetchedAt: string;
 }
+
+export type ScrapedPlaceType =
+  | "restaurant"
+  | "bar"
+  | "cafe"
+  | "attraction"
+  | "shopping"
+  | "airport"
+  | "transit_hub"
+  | "other";
 
 /** SSRF guard: http(s) only, no private/localhost/metadata targets. */
 export function isBlockedScrapeUrl(raw: string): boolean {
@@ -83,6 +94,29 @@ function metaContent(html: string, attr: string, name: string): string | null {
   return null;
 }
 
+function jsonLdObjects(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.flatMap(jsonLdObjects);
+  if (value === null || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  const nested = "@graph" in record ? jsonLdObjects(record["@graph"]) : [];
+  return [record, ...nested];
+}
+
+function jsonLdTypes(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  return [];
+}
+
+function isPlaceJsonLd(candidate: Record<string, unknown>): boolean {
+  const supported = [
+    "Place", "LocalBusiness", "FoodEstablishment", "Restaurant", "CafeOrCoffeeShop",
+    "BarOrPub", "NightClub", "TouristAttraction", "Museum", "ShoppingCenter", "Store",
+    "Airport", "BusStation", "TrainStation", "SubwayStation", "LodgingBusiness",
+  ];
+  return jsonLdTypes(candidate["@type"]).some((type) => supported.includes(type));
+}
+
 function firstJsonLd(html: string): Record<string, unknown> | null {
   const re = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
@@ -91,28 +125,28 @@ function firstJsonLd(html: string): Record<string, unknown> | null {
     if (!raw) continue;
     try {
       const parsed = JSON.parse(raw) as unknown;
-      const candidates = Array.isArray(parsed) ? parsed : [parsed];
-      for (const candidate of candidates) {
-        if (candidate !== null && typeof candidate === "object" && !Array.isArray(candidate)) {
-          const type = String((candidate as Record<string, unknown>)["@type"] ?? "");
-          if (
-            type.includes("TouristAttraction") ||
-            type.includes("Restaurant") ||
-            type.includes("LodgingBusiness") ||
-            type.includes("Place") ||
-            type.includes("LocalBusiness")
-          ) {
-            return candidate as Record<string, unknown>;
-          }
-        }
-      }
+      const candidates = jsonLdObjects(parsed);
+      const place = candidates.find(isPlaceJsonLd);
+      if (place) return place;
       // Fall back to the first object block when no typed block matches.
-      const first = candidates.find((c) => c !== null && typeof c === "object" && !Array.isArray(c));
-      if (first) return first as Record<string, unknown>;
+      if (candidates[0]) return candidates[0];
     } catch {
       continue;
     }
   }
+  return null;
+}
+
+function inferPlaceType(value: unknown): ScrapedPlaceType | null {
+  const types = new Set(jsonLdTypes(value));
+  if (types.has("Restaurant") || types.has("FoodEstablishment")) return "restaurant";
+  if (types.has("CafeOrCoffeeShop")) return "cafe";
+  if (types.has("BarOrPub") || types.has("NightClub")) return "bar";
+  if (types.has("TouristAttraction") || types.has("Museum")) return "attraction";
+  if (types.has("ShoppingCenter") || types.has("Store")) return "shopping";
+  if (types.has("Airport")) return "airport";
+  if (types.has("BusStation") || types.has("TrainStation") || types.has("SubwayStation")) return "transit_hub";
+  if (types.has("Place") || types.has("LocalBusiness") || types.has("LodgingBusiness")) return "other";
   return null;
 }
 
@@ -130,7 +164,7 @@ export function parseScrapeHtml(
   const ogDescription = metaContent(html, "og:description", "description");
   const ogImage = metaContent(html, "og:image", "image");
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  const title = ogTitle ?? (titleMatch?.[1] ? decodeEntities(titleMatch[1]) : null);
+  let title = ogTitle ?? (titleMatch?.[1] ? decodeEntities(titleMatch[1]) : null);
   const description = ogDescription;
 
   const jsonLd = firstJsonLd(html);
@@ -140,8 +174,11 @@ export function parseScrapeHtml(
   let openingHours: string | null = null;
   let phone: string | null = null;
   let priceHint: string | null = null;
+  let placeType: ScrapedPlaceType | null = null;
 
   if (jsonLd) {
+    title ??= jsonLdString(jsonLd["name"]);
+    placeType = inferPlaceType(jsonLd["@type"]);
     const addr = jsonLd["address"] as unknown;
     if (typeof addr === "string") address = addr.trim() || null;
     else if (addr !== null && typeof addr === "object" && !Array.isArray(addr)) {
@@ -209,5 +246,5 @@ export function parseScrapeHtml(
     }
   }
 
-  return { title, description, imageUrl, address, lat, lng, openingHours, phone, priceHint };
+  return { title, description, imageUrl, address, lat, lng, openingHours, phone, priceHint, placeType };
 }

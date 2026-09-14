@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -194,10 +194,7 @@ async function fetchBoard(tripId: string): Promise<BoardPayload> {
       itemRows = ((itemsNew.data ?? []) as unknown as Record<string, unknown>[]);
     }
 
-    const itemIdsRes = await supabase.from("checklist_items").select("id").in("checklist_id", listIds);
-    if (itemIdsRes.error) throw itemIdsRes.error;
-
-    const itemIds = ((itemIdsRes.data ?? []) as { id: string }[]).map((r) => r.id);
+    const itemIds = itemRows.map((row) => String(row["id"]));
     const blocksRes =
       itemIds.length > 0
         ? await supabase
@@ -296,7 +293,6 @@ export function ChecklistsView({ tripId, initialBoard, members, userId }: Checkl
 function ChecklistsViewInner({ tripId, initialBoard, members, userId }: ChecklistsViewProps) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [blockedItemId, setBlockedItemId] = useState<string | null>(null);
@@ -308,7 +304,7 @@ function ChecklistsViewInner({ tripId, initialBoard, members, userId }: Checklis
 
   function navigate(group: ChecklistGroup, filter: Tab): void {
     setSelectedListId(null);
-    router.replace(`${pathname}?group=${group}&filter=${filter}`, { scroll: false });
+    window.history.pushState(null, "", `${pathname}?group=${group}&filter=${filter}`);
   }
 
   const boardQ = useQuery({
@@ -431,7 +427,7 @@ function ChecklistsViewInner({ tripId, initialBoard, members, userId }: Checklis
 
   return (
     <>
-      <GroupTabs active={activeGroup} filter={tab} />
+      <GroupTabs active={activeGroup} filter={tab} onGroupChange={(group) => navigate(group, tab)} />
 
       {/* Per-group readiness (docs/14 §4.1): overall bar + urgent critical for this group. */}
       <ReadinessWidget
@@ -490,7 +486,7 @@ function ChecklistsViewInner({ tripId, initialBoard, members, userId }: Checklis
                     type="button"
                     onClick={() => {
                       setSelectedListId(listId);
-                      router.replace(`${pathname}?group=${activeGroup}&filter=all`, { scroll: false });
+                      window.history.pushState(null, "", `${pathname}?group=${activeGroup}&filter=all`);
                     }}
                     className="mb-1.5 inline-flex min-h-12 items-center gap-2 text-sm font-bold text-brand"
                   >

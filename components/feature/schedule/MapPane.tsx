@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LocateFixed, Navigation } from "lucide-react";
@@ -53,7 +53,8 @@ function parseLayersParam(): Set<MapLayerId> {
  */
 export function MapPane({ currentUserId, isOwner, onAddToDay }: MapPaneProps) {
   const queryClient = useQueryClient();
-  const [layers, setLayers] = useState<Set<MapLayerId>>(() => parseLayersParam());
+  const [layers, setLayers] = useState<Set<MapLayerId>>(() => new Set<MapLayerId>(["essentials"]));
+  const layersMounted = useRef(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<GeoPoint | null>(null);
@@ -76,7 +77,14 @@ export function MapPane({ currentUserId, isOwner, onAddToDay }: MapPaneProps) {
   const pins = useMemo(() => pinsQuery.data ?? [], [pinsQuery.data]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    setLayers(parseLayersParam());
+  }, []);
+
+  useEffect(() => {
+    if (!layersMounted.current) {
+      layersMounted.current = true;
+      return;
+    }
     const url = new URL(window.location.href);
     url.searchParams.set("layers", [...layers].join(","));
     window.history.replaceState(null, "", url.toString());

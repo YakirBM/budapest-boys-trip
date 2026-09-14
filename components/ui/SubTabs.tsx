@@ -15,6 +15,8 @@ export interface SubTabsProps {
   activeId: string;
   ariaLabel: string;
   className?: string;
+  /** Optional client-side selection for panes that already have their data. */
+  onSelect?: (id: string) => void;
 }
 
 /**
@@ -22,13 +24,13 @@ export interface SubTabsProps {
  * media views, lists groups). Equal tabs, 48px targets, brand underline for
  * the active tab. Links (not buttons) so every view is deep-linkable.
  */
-export function SubTabs({ tabs, activeId, ariaLabel, className }: SubTabsProps) {
+export function SubTabs({ tabs, activeId, ariaLabel, className, onSelect }: SubTabsProps) {
   return (
     <div
       role="tablist"
       aria-label={ariaLabel}
       className={clsx(
-        "sticky top-0 z-20 -mx-4 mb-3 flex border-b border-border bg-background/95 px-4 backdrop-blur",
+        "sticky top-[calc(env(safe-area-inset-top,0px)+8rem)] z-20 -mx-4 mb-3 flex border-b border-border bg-background/95 px-4 backdrop-blur",
         className,
       )}
     >
@@ -40,6 +42,11 @@ export function SubTabs({ tabs, activeId, ariaLabel, className }: SubTabsProps) 
             href={tab.href}
             role="tab"
             aria-selected={active}
+            onClick={(event) => {
+              if (!onSelect || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              onSelect(tab.id);
+            }}
             className={clsx(
               "relative flex min-h-12 flex-1 items-center justify-center gap-1.5 px-2 text-sm",
               "transition-colors",

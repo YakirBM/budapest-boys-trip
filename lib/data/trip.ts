@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+export { TRIP_ID } from "@/lib/trip-constants";
+import { TRIP_ID } from "@/lib/trip-constants";
 
 /**
  * Server-side data access for RSC pages (docs/02 §Data fetching).
@@ -8,8 +10,6 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
  */
 
 /** The single trip row (docs/09 §Seed strategy: the whole app assumes one trip). */
-export const TRIP_ID = "00000000-0000-4000-8000-000000000001";
-
 export interface TripMember {
   user_id: string;
   role: "owner" | "member";

@@ -17,6 +17,16 @@ test.describe("auth gate", () => {
     await expect(email).toBeVisible();
     await expect(email).toHaveAttribute("type", "email");
   });
+
+  test("travel hub is protected", async ({ page }) => {
+    await page.goto("/travel?tab=stay");
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("trip research API rejects anonymous callers", async ({ request }) => {
+    const response = await request.post("/api/trip-search", { data: { query: "Budapest" } });
+    expect(response.status()).toBe(401);
+  });
 });
 
 test.describe("PWA artifacts", () => {

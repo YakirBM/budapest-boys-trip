@@ -1,8 +1,7 @@
 "use client";
 
-import clsx from "clsx";
 import { useEffect, useState } from "react";
-import { Moon, Siren, Sun } from "lucide-react";
+import { CloudSun, MapPin, Moon, Palette, Siren, Sun, Umbrella } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -33,7 +32,10 @@ interface ShellWeather {
  */
 export function AppHeader() {
   const { preference, resolvedTheme, setTheme } = useTheme();
-  const [now, setNow] = useState(() => new Date());
+  // Keep the server HTML and the browser's first render identical. The live
+  // value starts after hydration; otherwise a one-second boundary causes React
+  // to discard and rebuild the entire application shell.
+  const [now, setNow] = useState<Date | null>(null);
   const [primary, setPrimary] = useState<ClockPrimary>("HU");
   const [weather, setWeather] = useState<ShellWeather | null>(null);
   const [accommodation, setAccommodation] = useState<AccommodationInfo>({
@@ -50,6 +52,7 @@ export function AppHeader() {
     } catch {
       // session-only default HU
     }
+    setNow(new Date());
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
@@ -111,39 +114,42 @@ export function AppHeader() {
     setTheme(preference === "system" ? "light" : preference === "light" ? "dark" : "system");
   };
 
-  const hu = formatFullTime(TZ_BUDAPEST, now);
-  const il = formatFullTime(TZ_JERUSALEM, now);
-  const first = primary === "HU"
-    ? { flag: "🇭🇺", label: t("header.budapest"), time: hu }
-    : { flag: "🇮🇱", label: t("header.israel"), time: il };
-  const second = primary === "HU"
-    ? { flag: "🇮🇱", label: t("header.israel"), time: il }
-    : { flag: "🇭🇺", label: t("header.budapest"), time: hu };
+  const hu = now ? formatFullTime(TZ_BUDAPEST, now) : "--:--:--";
+  const il = now ? formatFullTime(TZ_JERUSALEM, now) : "--:--:--";
+  const clockCards = [
+    { id: "HU" as const, flag: "🇭🇺", label: t("header.budapest"), time: hu },
+    { id: "IL" as const, flag: "🇮🇱", label: t("header.israel"), time: il },
+  ];
 
   return (
     <>
-      <header className="sticky top-0 z-40 -mx-4 border-b border-border bg-background/90 px-4 pt-safe backdrop-blur">
-        <div className="flex min-h-14 items-center gap-2 py-1.5">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-extrabold text-text-primary">
-              ✈️ {t("meta.shortTitle")} 2026
-            </p>
-            <p className="truncate text-xs text-text-muted">{formatFullDate(now)}</p>
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/88 px-3 pb-2 pt-safe shadow-[0_12px_35px_-30px_rgb(15_23_42/.7)] backdrop-blur-2xl">
+        <div className="flex min-h-[4.25rem] items-center gap-1.5 py-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-night text-lg text-white shadow-md">B</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="truncate text-[15px] font-extrabold tracking-tight text-text-primary">{t("meta.shortTitle")} 2026</p>
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-widest text-success"><span className="h-1.5 w-1.5 rounded-full bg-success" />{t("header.live")}</span>
+              </div>
+              <p className="truncate text-[11px] font-medium text-text-muted">{now ? formatFullDate(now) : "\u00a0"}</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={cycleTheme}
             aria-label={t("a11y.themeToggle")}
             title={t("theme.title")}
-            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-text-secondary transition-opacity active:opacity-80"
+            className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-surface-raised text-text-secondary shadow-sm transition-transform active:scale-95"
           >
-            {resolvedTheme === "dark" ? <Moon aria-hidden size={22} /> : <Sun aria-hidden size={22} />}
+            <Palette aria-hidden size={20} />
+            <span aria-hidden className="absolute bottom-1 end-1 grid h-4 w-4 place-items-center rounded-full bg-brand text-brand-contrast">{resolvedTheme === "dark" ? <Moon size={10} /> : <Sun size={10} />}</span>
           </button>
           <button
             type="button"
             onClick={() => setEmergencyOpen(true)}
             aria-label={t("a11y.emergency")}
-            className="inline-flex h-12 shrink-0 items-center gap-1.5 rounded-xl bg-danger px-3 text-sm font-bold text-white transition-opacity active:opacity-80"
+            className="inline-flex h-12 shrink-0 items-center gap-1.5 rounded-2xl bg-danger px-2.5 text-xs font-extrabold text-white shadow-[0_8px_20px_-10px_var(--c-danger)] transition-transform active:scale-95"
           >
             <Siren aria-hidden size={20} />
             {t("safety.emergencyTitle")}
@@ -151,51 +157,17 @@ export function AppHeader() {
           <ProfileMenu />
         </div>
 
-        <div className="scrollbar-none -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-2">
-          <div
-            role="group"
-            aria-label={t("header.swapClocks")}
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-surface-raised p-1"
-          >
-            <button
-              type="button"
-              onClick={() => swap(primary === "HU" ? "IL" : "HU")}
-              aria-label={t("header.swapClocks")}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5"
-            >
-              <span aria-hidden className="text-base leading-none">{first.flag}</span>
-              <span className="text-xs font-bold text-text-primary">{first.label}</span>
-              <span dir="ltr" className="tnum text-sm font-extrabold text-text-primary">
-                {first.time}
-              </span>
+        <div className="grid grid-cols-[1fr_1fr_1.05fr] gap-1.5" role="group" aria-label={t("header.swapClocks")}>
+          {clockCards.map((clock) => (
+            <button key={clock.id} type="button" onClick={() => swap(clock.id)} aria-pressed={primary === clock.id} aria-label={`${t("header.swapClocks")}: ${clock.label}`} className={`min-w-0 rounded-2xl border px-2 py-2 text-start transition-all active:scale-[.98] ${primary === clock.id ? "border-brand/40 bg-brand-soft shadow-sm" : "border-transparent bg-surface-raised/85"}`}>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-text-muted"><span aria-hidden>{clock.flag}</span><span className="truncate">{clock.label}</span></span>
+              <span dir="ltr" className="tnum mt-0.5 block text-[13px] font-extrabold tracking-tight text-text-primary">{clock.time}</span>
             </button>
-            <span aria-hidden className={clsx("h-5 w-px bg-border")} />
-            <button
-              type="button"
-              onClick={() => swap(primary === "HU" ? "IL" : "HU")}
-              aria-label={t("header.swapClocks")}
-              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 opacity-75"
-            >
-              <span aria-hidden className="text-sm leading-none">{second.flag}</span>
-              <span className="text-[11px] font-medium text-text-muted">{second.label}</span>
-              <span dir="ltr" className="tnum text-xs font-semibold text-text-secondary">
-                {second.time}
-              </span>
-            </button>
+          ))}
+          <div title={t("header.weatherTitle")} className="min-w-0 rounded-2xl bg-night px-2 py-2 text-white shadow-sm">
+            <span className="flex items-center gap-1 text-[10px] font-bold text-white/65"><MapPin aria-hidden size={11} />{t("header.budapest")}</span>
+            {weather && weather.tempMin !== null && weather.tempMax !== null ? <span className="mt-0.5 flex items-center gap-1.5"><CloudSun aria-hidden size={15} className="text-[#f4ba53]" /><span dir="ltr" className="tnum text-[12px] font-extrabold">{weather.tempMin}°–{weather.tempMax}°</span>{weather.precipProb !== null && <span className="flex items-center gap-0.5 text-[10px] text-white/70"><Umbrella aria-hidden size={10} />{weather.precipProb}%</span>}</span> : <span className="mt-0.5 block truncate text-[10px] text-white/60">{t("header.weatherUnavailable")}</span>}
           </div>
-
-          {weather && weather.tempMin !== null && weather.tempMax !== null && (
-            <span
-              title={t("header.weatherTitle")}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-surface-raised px-2.5 py-2 text-xs text-text-secondary"
-            >
-              <span aria-hidden>🌤</span>
-              <span dir="ltr" className="tnum font-bold">
-                {weather.tempMin}°–{weather.tempMax}°
-              </span>
-              {weather.precipProb !== null && <span>☔ {weather.precipProb}%</span>}
-            </span>
-          )}
         </div>
       </header>
 

@@ -19,14 +19,19 @@ export function useOutboxSync(onChange?: (pending: number) => void): void {
     };
 
     const trigger = () => {
-      void flushOutbox().then(notify);
+      void flushOutbox().then(notify).catch((error: unknown) => {
+        console.error("outbox sync failed", error);
+      });
     };
 
-    void notify();
-    window.addEventListener("online", trigger);
-    window.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") trigger();
+    void notify().catch((error: unknown) => {
+      console.error("outbox count failed", error);
     });
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") trigger();
+    };
+    window.addEventListener("online", trigger);
+    window.addEventListener("visibilitychange", onVisibilityChange);
 
     const onSwMessage = (event: MessageEvent) => {
       if (event.data?.type === "outbox-flush") trigger();
@@ -36,6 +41,7 @@ export function useOutboxSync(onChange?: (pending: number) => void): void {
     return () => {
       cancelled = true;
       window.removeEventListener("online", trigger);
+      window.removeEventListener("visibilitychange", onVisibilityChange);
       navigator.serviceWorker?.removeEventListener("message", onSwMessage);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

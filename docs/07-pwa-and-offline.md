@@ -87,6 +87,11 @@ commit SHA is the cache version (local builds use a unique timestamp).
 Use **Dexie** (IndexedDB wrapper) as the on-device store. Mirror only what the offline contract needs;
 Supabase stays the source of truth.
 
+The implemented unified `outbox` schema is currently at Dexie version 2. Its
+indexes are `id` (primary key), `table`, `created_at`, and `failed`. Version 2
+adds the `table` index in place so expense split reconciliation can select only
+queued expense operations without deleting existing device data.
+
 ```ts
 // lib/offline/db.ts
 import Dexie, { type Table } from "dexie";

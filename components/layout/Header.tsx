@@ -19,13 +19,14 @@ export interface HeaderProps {
 
 /**
  * Header — page title (h1, text-start) + optional single context action at the
- * end edge. Sticky, blur-backed. Pages compose it; the shell does not.
+ * end edge. The global shell owns stickiness; page titles scroll naturally so
+ * they never cover the live console or secondary tabs.
  */
 export function Header({ title, subtitle, action, className }: HeaderProps) {
   return (
     <header
       className={clsx(
-        "sticky top-0 z-30 -mx-4 mb-4 flex min-h-14 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur",
+        "-mx-4 mb-4 flex min-h-16 items-center gap-2 border-b border-border bg-surface/55 px-4",
         className,
       )}
     >

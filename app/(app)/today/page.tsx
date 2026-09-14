@@ -2,7 +2,6 @@ import { Header } from "@/components/layout/Header";
 import { t } from "@/lib/i18n";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { fetchTodayData } from "@/lib/data/today";
-import { fetchRouteData, fetchMapData } from "@/lib/data/route";
 import { currentTripDayClamped } from "@/lib/utils/time";
 import { TodayDashboard, type TodaySub } from "@/components/feature/schedule/TodayDashboard";
 
@@ -36,12 +35,9 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const [{ data: userData }] = await Promise.all([supabase.auth.getUser()]);
   const currentUserId = userData.user?.id ?? null;
 
-  const [initialToday] = await Promise.all([
-    fetchTodayData(supabase, dayNumber),
-    // Prefetch route + map so the discover/map panes hydrate instantly.
-    fetchRouteData(supabase, dayNumber).catch(() => null),
-    fetchMapData(supabase).catch(() => null),
-  ]);
+  // Discover and Map fetch only when their pane is opened. Their previous
+  // eager fetches were discarded and delayed every Schedule navigation.
+  const initialToday = await fetchTodayData(supabase, dayNumber);
 
   const isOwner = initialToday.members.some(
     (m) => m.id === currentUserId && m.role === "owner" && m.active,

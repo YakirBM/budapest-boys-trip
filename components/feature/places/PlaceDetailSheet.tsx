@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigation } from "lucide-react";
 import { t } from "@/lib/i18n";
 import type { LibraryPlace } from "@/lib/data/route";
@@ -31,6 +31,11 @@ export function PlaceDetailSheet({ place, currentUserId, onClose, onStatusChange
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState(false);
 
+  useEffect(() => {
+    setRejectReason("");
+    setRejectError(false);
+  }, [place?.id]);
+
   if (!place) return null;
 
   const navUrl =
@@ -53,6 +58,14 @@ export function PlaceDetailSheet({ place, currentUserId, onClose, onStatusChange
   return (
     <BottomSheet open onClose={onClose} title={current.name}>
       <div className="flex flex-col gap-3 pb-2">
+        {current.imageUrl && (
+          <div
+            role="img"
+            aria-label={current.name}
+            className="h-44 w-full rounded-2xl bg-cover bg-center shadow-sm"
+            style={{ backgroundImage: `linear-gradient(180deg, transparent, rgb(0 0 0 / 0.25)), url(${JSON.stringify(current.imageUrl)})` }}
+          />
+        )}
         <div className="flex items-center gap-2">
           <CategoryIcon category={current.category} size={36} />
           <div className="min-w-0 flex-1">
@@ -88,6 +101,29 @@ export function PlaceDetailSheet({ place, currentUserId, onClose, onStatusChange
         )}
 
         {current.note && <p className="text-sm leading-6 text-text-secondary">{current.note}</p>}
+
+        {(current.address || current.phone || current.openingHoursNote) && (
+          <dl className="grid gap-2 rounded-xl border border-border bg-surface-raised/60 p-3 text-sm">
+            {current.address && (
+              <div>
+                <dt className="text-xs font-bold text-text-muted">{t("route.detail.address")}</dt>
+                <dd className="mt-0.5 text-text-primary">{current.address}</dd>
+              </div>
+            )}
+            {current.phone && (
+              <div>
+                <dt className="text-xs font-bold text-text-muted">{t("route.detail.phone")}</dt>
+                <dd className="mt-0.5"><a href={`tel:${current.phone}`} dir="ltr" className="ltr-iso font-semibold text-brand">{current.phone}</a></dd>
+              </div>
+            )}
+            {current.openingHoursNote && (
+              <div>
+                <dt className="text-xs font-bold text-text-muted">{t("route.detail.hours")}</dt>
+                <dd className="mt-0.5 text-text-primary">{current.openingHoursNote}</dd>
+              </div>
+            )}
+          </dl>
+        )}
 
         {current.source && (
           <p className="text-xs text-text-muted">

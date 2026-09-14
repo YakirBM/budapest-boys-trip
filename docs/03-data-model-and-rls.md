@@ -134,6 +134,7 @@ create table public.trip_members (
 create table public.places (
   trip_id uuid not null references public.trips(id) on delete cascade,
   name text not null,  google_maps_url text,  url text,  image_url text,
+  address_text text,  phone text,
   type place_type not null default 'other',
   est_price numeric(12,2),  price_currency char(3) not null default 'HUF',
   district text,                                   -- e.g. 'VII. kerület'

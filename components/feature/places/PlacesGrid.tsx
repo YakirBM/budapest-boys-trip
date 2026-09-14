@@ -165,7 +165,11 @@ export function PlacesGrid({ places, onOpen, onAdd }: PlacesGridProps) {
                     aria-hidden
                     className="absolute inset-0"
                     style={{
-                      background: "linear-gradient(135deg, var(--color-brand-soft), var(--color-surface-raised))",
+                      backgroundImage: place.imageUrl
+                        ? `linear-gradient(180deg, rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.4)), url(${JSON.stringify(place.imageUrl)})`
+                        : "linear-gradient(135deg, var(--color-brand-soft), var(--color-surface-raised))",
+                      backgroundPosition: "center",
+                      backgroundSize: "cover",
                     }}
                   />
                   <span className="absolute start-2 top-2 rounded-full bg-surface-raised/90 px-2 py-0.5 text-[11px] font-bold text-text-primary">

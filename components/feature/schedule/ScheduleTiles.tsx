@@ -18,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { MessageSquare, Navigation } from "lucide-react";
+import { GripVertical, MessageSquare, Navigation } from "lucide-react";
 import clsx from "clsx";
 import { t } from "@/lib/i18n";
 import { formatInTz, TZ_BUDAPEST } from "@/lib/utils/time";
@@ -221,14 +221,15 @@ function SortableTile({
                 >
                   <span aria-hidden className="text-lg leading-none">⋯</span>
                 </button>
-                <span
-                  aria-hidden
-                  className="inline-flex h-12 w-8 cursor-grab touch-none items-center justify-center rounded-xl text-text-muted"
+                <button
+                  type="button"
+                  aria-label={`${t("today.dnd.reorderHint")}: ${item.title}`}
+                  className="inline-flex h-12 w-12 cursor-grab touch-none items-center justify-center rounded-xl text-text-muted hover:bg-surface-raised active:cursor-grabbing"
                   {...attributes}
                   {...listeners}
                 >
-                  <span className="text-base leading-none">⠿</span>
-                </span>
+                  <GripVertical aria-hidden size={20} />
+                </button>
               </div>
             </div>
 

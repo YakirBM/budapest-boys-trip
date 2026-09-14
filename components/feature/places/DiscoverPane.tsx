@@ -107,26 +107,26 @@ export function DiscoverPane({ dayNumber, currentUserId, onAddToDay }: DiscoverP
         google_maps_url: payload.mapsUrl || null,
         district: payload.district || null,
         address_text: payload.address || null,
+        phone: payload.phone || null,
         lat: lat !== null && Number.isFinite(lat) ? lat : null,
         lng: lng !== null && Number.isFinite(lng) ? lng : null,
         tags: payload.tags,
         est_price: payload.price ? Number(payload.price) : null,
         price_currency: payload.currency,
-        price_source: payload.priceSource ? "api" : "manual",
+        price_source: payload.price && payload.priceSource ? "api" : "manual",
         source: payload.source || (payload.mapsUrl ? "member pasted link" : "manual entry"),
-        last_verified_at: payload.source ? new Date().toISOString() : null,
+        last_verified_at: payload.verifiedAt || null,
         opening_hours: payload.hoursNote ? { note: payload.hoursNote } : null,
         needs_reservation: payload.needsReservation,
         note: payload.note || null,
         image_url: payload.cover || null,
-        suggested_by: currentUserId,
-        status: "idea",
+        status: editing?.status ?? "idea",
       };
       if (editing) {
         const { error } = await supabase.from("places").update(row).eq("id", editing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("places").insert(row);
+        const { error } = await supabase.from("places").insert({ ...row, suggested_by: currentUserId });
         if (error) throw error;
       }
       pushToast({ message: t("route.form.saved"), type: "success" });

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { t } from "@/lib/i18n";
+import { lockDocumentScroll } from "@/lib/utils/scroll-lock";
 
 export interface BottomSheetProps {
   open: boolean;
@@ -39,7 +40,7 @@ export function BottomSheet({ open, onClose, title, children, destructive = fals
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    document.documentElement.style.overflow = "hidden";
+    const unlockScroll = lockDocumentScroll();
 
     const panel = panelRef.current;
     const focusables = () =>
@@ -74,7 +75,7 @@ export function BottomSheet({ open, onClose, title, children, destructive = fals
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      document.documentElement.style.overflow = "";
+      unlockScroll();
       previouslyFocused?.focus?.();
     };
   }, [open, onClose]);

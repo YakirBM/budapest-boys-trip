@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Link2 } from "lucide-react";
 import { t } from "@/lib/i18n";
-import type { LibraryPlace } from "@/lib/data/route";
+import type { LibraryPlace, PlaceType } from "@/lib/data/route";
 import type { Category } from "@/components/ui/types";
 import type { Currency } from "@/lib/utils/money";
 import { CURRENCIES } from "@/lib/utils/money";
@@ -19,6 +19,7 @@ export interface PlaceFormPayload {
   mapsUrl: string;
   district: string;
   address: string;
+  phone: string;
   lat: string;
   lng: string;
   tags: string[];
@@ -30,6 +31,7 @@ export interface PlaceFormPayload {
   note: string;
   cover: string;
   source: string;
+  verifiedAt: string;
 }
 
 export interface PlaceFormSheetProps {
@@ -40,7 +42,7 @@ export interface PlaceFormSheetProps {
   saving?: boolean;
 }
 
-const PLACE_TYPES = [
+const PLACE_TYPES: PlaceType[] = [
   "restaurant",
   "bar",
   "cafe",
@@ -57,6 +59,7 @@ const PLACE_TYPES = [
 ] as const;
 
 const CATEGORIES: Category[] = ["food", "attraction", "walk", "transit", "rest", "nightlife", "other"];
+const PLACE_TAGS = ["kosher", "outdoor", "rain-backup", "verify-hours"] as const;
 
 /**
  * PlaceFormSheet — add/edit place (docs/14 §3.4.2). Fetch-from-link fills
@@ -64,22 +67,51 @@ const CATEGORIES: Category[] = ["food", "attraction", "walk", "transit", "rest",
  */
 export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false }: PlaceFormSheetProps) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [type, setType] = useState<string>("other");
+  const [type, setType] = useState<PlaceType>(initial?.type ?? "other");
   const [mapsUrl, setMapsUrl] = useState(initial?.googleMapsUrl ?? "");
   const [district, setDistrict] = useState(initial?.district ?? "");
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(initial?.address ?? "");
+  const [phone, setPhone] = useState(initial?.phone ?? "");
   const [lat, setLat] = useState(initial?.lat !== null && initial?.lat !== undefined ? String(initial.lat) : "");
   const [lng, setLng] = useState(initial?.lng !== null && initial?.lng !== undefined ? String(initial.lng) : "");
   const [tags, setTags] = useState<string[]>(initial?.tags ?? []);
   const [price, setPrice] = useState(initial?.estPrice !== null && initial?.estPrice !== undefined ? String(initial.estPrice) : "");
   const [currency, setCurrency] = useState<Currency>(initial?.priceCurrency ?? "HUF");
-  const [priceSource, setPriceSource] = useState(initial?.source ?? "");
-  const [hoursNote, setHoursNote] = useState("");
+  const [priceSource, setPriceSource] = useState("");
+  const [hoursNote, setHoursNote] = useState(initial?.openingHoursNote ?? "");
   const [needsReservation, setNeedsReservation] = useState(initial?.needsReservation ?? false);
   const [note, setNote] = useState(initial?.note ?? "");
-  const [cover, setCover] = useState("");
-  const [fetchState, setFetchState] = useState<"idle" | "loading" | "failed">("idle");
+  const [cover, setCover] = useState(initial?.imageUrl ?? "");
+  const [source, setSource] = useState(initial?.source ?? "");
+  const [verifiedAt, setVerifiedAt] = useState(initial?.lastVerifiedAt ?? "");
+  const [priceHint, setPriceHint] = useState("");
+  const [fetchState, setFetchState] = useState<"idle" | "loading" | "success" | "failed">("idle");
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(initial?.name ?? "");
+    setType(initial?.type ?? "other");
+    setMapsUrl(initial?.googleMapsUrl ?? "");
+    setDistrict(initial?.district ?? "");
+    setAddress(initial?.address ?? "");
+    setPhone(initial?.phone ?? "");
+    setLat(initial?.lat !== null && initial?.lat !== undefined ? String(initial.lat) : "");
+    setLng(initial?.lng !== null && initial?.lng !== undefined ? String(initial.lng) : "");
+    setTags(initial?.tags ?? []);
+    setPrice(initial?.estPrice !== null && initial?.estPrice !== undefined ? String(initial.estPrice) : "");
+    setCurrency(initial?.priceCurrency ?? "HUF");
+    setPriceSource("");
+    setHoursNote(initial?.openingHoursNote ?? "");
+    setNeedsReservation(initial?.needsReservation ?? false);
+    setNote(initial?.note ?? "");
+    setCover(initial?.imageUrl ?? "");
+    setSource(initial?.source ?? "");
+    setVerifiedAt(initial?.lastVerifiedAt ?? "");
+    setPriceHint("");
+    setFetchState("idle");
+    setFormError(null);
+  }, [initial, open]);
 
   const inputClass =
     "min-h-12 w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-brand focus:outline-none";
@@ -109,7 +141,10 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
         lng?: number | null;
         openingHours?: string | null;
         phone?: string | null;
+        priceHint?: string | null;
+        placeType?: PlaceType | null;
         source?: string;
+        fetchedAt?: string;
       };
       if (data.title && !name.trim()) setName(data.title.slice(0, 120));
       if (data.address && !address.trim()) setAddress(data.address);
@@ -117,9 +152,13 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
       if (data.lng !== null && data.lng !== undefined) setLng(String(data.lng));
       if (data.imageUrl) setCover(data.imageUrl);
       if (data.openingHours) setHoursNote(data.openingHours);
+      if (data.phone) setPhone(data.phone);
+      if (data.placeType) setType(data.placeType);
       if (data.description && !note.trim()) setNote(data.description.slice(0, 200));
-      if (data.source) setPriceSource(data.source);
-      setFetchState("idle");
+      if (data.priceHint) setPriceHint(data.priceHint);
+      if (data.source) setSource(data.source);
+      if (data.fetchedAt) setVerifiedAt(data.fetchedAt);
+      setFetchState("success");
     } catch {
       setFetchState("failed");
       setFormError(t("route.form.fetchFailed"));
@@ -135,12 +174,24 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
       setFormError(t("route.errors.addressRequired"));
       return;
     }
+    const parsedLat = lat.trim() ? Number(lat) : null;
+    const parsedLng = lng.trim() ? Number(lng) : null;
+    const parsedPrice = price.trim() ? Number(price) : null;
+    if (
+      (parsedLat !== null && (!Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90)) ||
+      (parsedLng !== null && (!Number.isFinite(parsedLng) || parsedLng < -180 || parsedLng > 180)) ||
+      (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0))
+    ) {
+      setFormError(t("route.errors.invalidNumber"));
+      return;
+    }
     await onSave({
       name: name.trim(),
       type,
       mapsUrl: mapsUrl.trim(),
       district: district.trim(),
       address: address.trim(),
+      phone: phone.trim(),
       lat: lat.trim(),
       lng: lng.trim(),
       tags,
@@ -151,7 +202,8 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
       needsReservation,
       note: note.trim(),
       cover: cover.trim(),
-      source: priceSource.trim(),
+      source: source.trim(),
+      verifiedAt,
     });
   }
 
@@ -168,14 +220,14 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
 
         <div>
           <label className={labelClass} htmlFor="place-name">{t("route.form.fieldName")}</label>
-          <input id="place-name" type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+          <input id="place-name" type="text" maxLength={120} value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
         </div>
 
         <div>
           <label className={labelClass} htmlFor="place-type">{t("route.form.fieldType")}</label>
-          <select id="place-type" value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
+          <select id="place-type" value={type} onChange={(e) => setType(e.target.value as PlaceType)} className={inputClass}>
             {PLACE_TYPES.map((option) => (
-              <option key={option} value={option}>{option}</option>
+              <option key={option} value={option}>{t(`route.form.types.${option}`)}</option>
             ))}
           </select>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -202,6 +254,21 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
             {t("route.form.fetchFromLink")}
           </Button>
           <p className="mt-1 text-xs text-text-muted">{t("route.form.confirmHint")}</p>
+          {fetchState === "success" && (
+            <div role="status" className="mt-2 rounded-xl border border-success/30 bg-success/8 px-3 py-2 text-xs text-text-secondary">
+              <p className="font-bold text-success">{t("route.form.fetchSuccess")}</p>
+              {source && <p>{t("route.form.sourceLabel")}: <span dir="ltr" className="ltr-iso font-semibold">{source}</span></p>}
+              {verifiedAt && (
+                <p>{t("route.form.verifiedLabel")}: <span className="tnum">{new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short" }).format(new Date(verifiedAt))}</span></p>
+              )}
+              {priceHint && <p>{t("route.form.priceHintLabel")}: <span dir="ltr" className="ltr-iso font-semibold">{priceHint}</span></p>}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className={labelClass} htmlFor="place-phone">{t("route.form.fieldPhone")}</label>
+          <input id="place-phone" type="tel" dir="ltr" maxLength={40} value={phone} onChange={(e) => setPhone(e.target.value)} className={`${inputClass} ltr-iso tnum`} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -211,7 +278,7 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
           </label>
           <label className="block">
             <span className={labelClass}>{t("route.form.fieldAddress")}</span>
-            <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
+            <input type="text" maxLength={300} value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
           </label>
         </div>
 
@@ -229,7 +296,7 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
         <div>
           <span className={labelClass}>{t("route.form.fieldTags")}</span>
           <div className="flex flex-wrap gap-2">
-            {["kosher", "outdoor", "rain-backup", "verify-hours"].map((tag) => {
+            {PLACE_TAGS.map((tag) => {
               const active = tags.includes(tag);
               return (
                 <button
@@ -242,7 +309,7 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
                     active ? "border-transparent bg-brand text-brand-contrast" : "border-border bg-surface text-text-secondary",
                   )}
                 >
-                  {tag === "kosher" ? t("route.form.tagKosher") : tag}
+                  {t(`route.form.tags.${tag}`)}
                 </button>
               );
             })}
@@ -298,6 +365,14 @@ export function PlaceFormSheet({ open, onClose, initial, onSave, saving = false 
             onChange={(e) => setCover(e.target.value)}
             className={`${inputClass} ltr-iso tnum`}
           />
+          {cover && (
+            <div
+              role="img"
+              aria-label={t("route.form.coverPreview")}
+              className="mt-2 h-36 rounded-xl bg-cover bg-center shadow-sm"
+              style={{ backgroundImage: `linear-gradient(180deg, transparent, rgb(0 0 0 / 0.22)), url(${JSON.stringify(cover)})` }}
+            />
+          )}
         </div>
 
         <Button block loading={saving} onClick={() => void handleSave()}>

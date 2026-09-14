@@ -16,6 +16,7 @@
 - **Built**: Phase 0 primitives (`AmountInput`, `SubTabs`, `GroupPersonalToggle`, tile scrims, `@dnd-kit/*`); Phase 1 shell (`AppHeader` live HU/IL flag clocks + weather + theme + emergency + `ProfileMenu` full edit/logout, 4-tab `BottomNav`, `0023_profile_extended.sql` + `avatars` bucket + `updateMyProfileAction`); Tab 1 schedule tiles/drawer/comments + places grid/form + `/api/scrape` + shared `map_pins` (`0018/0019/0020`); Tab 2 checklist groups (`0021`); Tab 3 money wording/converter/reports; Tab 4 media albums/views + `/api/geocode` (`0022`).
 - **Evidence**: `pnpm typecheck` 0 errors, `pnpm lint` 0 problems, `pnpm test` 120/120 (16 files), `pnpm test:e2e` 12/12, `pnpm build` green (16 routes). Hebrew-literal scan clean in new TSX; banned-word scan clean in money components.
 - **Pending (needs secrets/network or human)**: `pnpm db:push` for migrations 0018–0023; full `supabase/rls-tests.sql` run (B3, needs direct SQL); `scripts/visual-audit.mjs` RTL/theme screenshots; real-device UAT + magic-link test (B2).
+- **DEPLOYED (2026-09-11)**: commit `abd27f7` pushed to `main` + `vercel --prod` green (16 routes, incl. new `/api/scrape`, `/api/geocode`), aliased to https://medbadboys.vercel.app — verified serving (login renders).
 
 ## T-001 — Supabase publishable key 401: **RESOLVED (2026-09-11)**
 
@@ -151,3 +152,92 @@ Final state: **12/12 authenticated pages render on production (today/route/map/m
 - [ ] Supabase Auth → URL Configuration: add `https://medbadboys.vercel.app/**` (localhost already added) — REQUIRED before magic links work from production
 - [ ] Rotate sb_secret/service-role keys (exposed in chat) and update .env.local + Vercel
 - [ ] Each member: insurance + (optional) medical profile + passport scan via the app (PRIVATE paths only)
+
+## 2026-09-13 — Premium rebuild, Phase 1
+
+- Rebuilt the global live header and floating bottom navigation; fixed the
+  page-header/sub-tab sticky collision and AppHeader horizontal overflow.
+- Added draggable persisted travel bubble and unified `/travel` flight/stay hub.
+- Added left-side group-chat/search drawer, private attachment storage, Realtime
+  messages, and authenticated `/api/trip-search` with web citations and Places save.
+- Fixed private profile column exposure with explicit column grants and a
+  self-only security-barrier view; ProfileMenu now reads that view.
+- Applied previously missing migrations `0018`–`0026` to the linked Supabase
+  project. A follow-up dry run reports the remote schema is up to date.
+- Green: typecheck, lint, 120 unit tests, production build (17 routes), 16/16
+  mobile Playwright tests, and seed verification. `OPENAI_API_KEY` is not yet
+  configured locally, so the AI pane intentionally returns its explicit
+  unavailable state until the server-only key is added locally and in Vercel.
+  Migration 0026 temporarily preserves the old production ProfileMenu read;
+  re-apply the narrow 0025 grants in a coordinated code deployment.
+
+### Desktop interaction repair pass
+
+- Replaced the desktop profile bottom sheet with an anchored, independently
+  scrollable popover; mobile retains the touch-friendly bottom sheet.
+- Reworked the travel bubble gesture state: an 8px drag threshold prevents
+  pointer jitter from cancelling clicks, keyboard/click activation uses the
+  native click path, and a new persisted-position version places the default
+  beside the centered app on desktop.
+- Removed global smooth scrolling, clipped horizontal overflow at the document
+  and shell boundaries, and added a reference-counted dialog scroll lock so
+  stacked overlays cannot leave the document frozen.
+- Split the realtime/search drawer into a lazy client chunk. Bottom navigation
+  prefetches its four primary destinations after hydration and exposes an
+  immediate pending state while a route is resolving.
+- Development mode unregisters a worker left by a previous local production
+  preview, preventing stale shell assets from masking current UI fixes.
+- Verified: typecheck, lint, 120/120 unit tests, production build, and 16/16
+  Playwright tests against `next start`. The local `next dev` server was then
+  restored and health-checked on port 3000.
+
+### Console-error repair
+
+- Removed the live-clock hydration mismatch by rendering a deterministic clock
+  placeholder on both SSR and the first client pass, then starting the clock
+  immediately after hydration.
+- Upgraded the Dexie database to version 2 with the missing `outbox.table`
+  index. The upgrade is in place and preserves queued offline operations.
+- Added rejection handling around outbox/split reconciliation and corrected the
+  visibility listener cleanup so development refreshes do not accumulate sync
+  handlers.
+
+### Premium rebuild, product slices 2–5
+
+- Our Day: client-only schedule/discover/map switching, Next-prefetched day
+  links, deferred map/place loading, optimistic accessible drag ordering, and
+  parallel reorder persistence.
+- Lists: instant URL-backed life-phase/filter switching, phase icons, and one
+  fewer Supabase request per board refresh.
+- Money: replaced ambiguous balance/stat labels with explicit payer/debtor
+  language and enabled incremental offscreen ledger rendering.
+- Memory Wall: moved upload metadata from the always-open page body into a
+  dedicated bottom drawer, corrected its sticky control offset, and enabled
+  progressive masonry rendering.
+
+### Places library persistence and enrichment repair
+
+- Fixed a production-schema mismatch that caused the redesigned place form to
+  write a nonexistent `places.address_text` column. Additive migration
+  `20260913090000_places_contact_details.sql` adds constrained address and phone
+  fields and is applied to the linked Supabase project.
+- Place queries and edit state now round-trip raw type, full address, phone,
+  cover image and opening-hours note. Editing retains status and suggester;
+  opening another record starts with clean state.
+- `/api/scrape` parsing now supports nested schema.org `@graph`, explicit place
+  type inference, phone and price-range hints. The UI records the returned
+  source and exact fetch timestamp, labels nonnumeric price hints, and requires
+  user confirmation before saving.
+- Green at the full gate: typecheck, lint, 122/122 unit tests (including 5
+  scraper tests), seed verification, migration dry-run/apply, a live remote
+  query of the new columns, production build, and 16/16 Playwright tests.
+- A separate authenticated desktop audit exercised create → detail → edit,
+  verified the persisted address/phone values and zero console errors, then
+  deleted its exact test row. Supabase Advisors also exposed and drove the
+  `v_profile_private` security-invoker repair
+  (`20260914104229_fix_profile_view_security_invoker.sql`); security advisors
+  now return zero error-level findings.
+- Deployment coordination adds `get_my_private_profile()` as a self-only RPC
+  (`20260914105540_profile_private_rpc.sql`). The new ProfileMenu reads the RPC;
+  the compatibility-wide `profiles` SELECT grant is removed only after this
+  frontend revision is confirmed live.

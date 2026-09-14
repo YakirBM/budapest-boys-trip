@@ -23,6 +23,22 @@ describe("scrape helpers", () => {
     expect(out.address).toContain("Budapest");
     expect(out.lat).toBeCloseTo(47.5189);
     expect(out.phone).toBe("+3614684040");
+    expect(out.placeType).toBe("restaurant");
+    expect(out.priceHint).toBe("$$$");
+  });
+
+  it("finds place data nested in a JSON-LD graph", () => {
+    const html = `<script type="application/ld+json">{
+      "@context":"https://schema.org",
+      "@graph":[
+        {"@type":"WebSite","name":"Example"},
+        {"@type":["LocalBusiness","CafeOrCoffeeShop"],"name":"Central Café","address":"Károlyi utca 9, Budapest"}
+      ]
+    }</script>`;
+    const out = parseScrapeHtml(html, "https://example.com/cafe");
+    expect(out.title).toBe("Central Café");
+    expect(out.address).toBe("Károlyi utca 9, Budapest");
+    expect(out.placeType).toBe("cafe");
   });
 
   it("extracts coordinates from a Google Maps URL", () => {

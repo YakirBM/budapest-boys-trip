@@ -71,6 +71,7 @@
   --color-accent-paprika: var(--c-accent-paprika);
   --color-accent-gold: var(--c-accent-gold);
   --color-accent-lilac: var(--c-accent-lilac);
+  --color-night: var(--c-night);
 
   /* Deterministic member identity colours (docs/05 §7). Slot bg + ink pairs
      are AA-verified per theme; mapping lives in lib/utils/member-style.ts. */
@@ -109,6 +110,7 @@
   --c-accent-paprika: #e4572e;
   --c-accent-gold: #d9992b;
   --c-accent-lilac: #7c6ff0;
+  --c-night: #132c2b;
 
   --c-member-1: #0b645d;
   --c-member-1-ink: #ffffff;
@@ -166,6 +168,7 @@
   --c-accent-paprika: #ff7a52;
   --c-accent-gold: #f6bd4f;
   --c-accent-lilac: #a79bff;
+  --c-night: #102725;
 
   --c-member-1: #2dd4c4;
   --c-member-1-ink: #062825;
@@ -203,7 +206,8 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
+    overflow-x: clip;
   }
 
   body {
@@ -211,6 +215,8 @@
     color: var(--c-text-primary);
     text-align: start; /* never justify Hebrew */
     -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+    overflow-x: clip;
   }
 
   /* §10 — focus-visible ring: 2px brand + 2px offset, on all interactive elements */
@@ -249,6 +255,11 @@
   to {
     opacity: 1;
   }
+}
+
+@keyframes drawer-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
 @keyframes brand-pulse {
@@ -329,6 +340,15 @@
 
 @utility anim-fade-in {
   animation: fade-in 200ms ease-out both;
+}
+
+.chat-drawer-in {
+  animation: drawer-in-left 220ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.travel-bubble {
+  will-change: transform;
+  transition: box-shadow 160ms ease, scale 120ms ease;
 }
 
 /* Interactive map markers. Geographic positioning is owned by MapLibre and is

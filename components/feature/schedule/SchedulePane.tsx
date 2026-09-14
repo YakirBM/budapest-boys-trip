@@ -117,6 +117,8 @@ export function SchedulePane({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [localGroupOrder, setLocalGroupOrder] = useState<string[] | null>(null);
+  const [localPersonalOrder, setLocalPersonalOrder] = useState<string[] | null>(null);
 
   const personalKey = ["personal", TRIP_ID, dayNumber] as const;
   const snapshotKey = `schedule-day-${dayNumber}`;
@@ -226,7 +228,21 @@ export function SchedulePane({
     () => personalItems.map((row) => personalToTile(row, commentCounts)),
     [personalItems, commentCounts],
   );
-  const visibleTiles = scope === "group" ? groupTiles : personalTiles;
+  const visibleTiles = useMemo(() => {
+    const source = scope === "group" ? groupTiles : personalTiles;
+    const order = scope === "group" ? localGroupOrder : localPersonalOrder;
+    if (!order) return source;
+    const index = new Map(order.map((id, position) => [id, position]));
+    return source.map((tile) => ({
+      ...tile,
+      sortOrder: index.has(tile.id) ? (index.get(tile.id)! + 1) * 10 : tile.sortOrder,
+    }));
+  }, [groupTiles, localGroupOrder, localPersonalOrder, personalTiles, scope]);
+
+  useEffect(() => {
+    setLocalGroupOrder(null);
+    setLocalPersonalOrder(null);
+  }, [dayNumber]);
 
   const anchorConflict = useMemo(
     () => visibleTiles.some((tile) => isDay5AnchorConflict(dayNumber, tile.startTime)),
@@ -251,16 +267,19 @@ export function SchedulePane({
     const orders = rebalanceSortOrders(orderedIds.length);
     const orderById = new Map(orderedIds.map((id, index) => [id, orders[index] ?? (index + 1) * 10]));
     setPendingIds(new Set(orderedIds));
+    if (scope === "group") setLocalGroupOrder(orderedIds);
+    else setLocalPersonalOrder(orderedIds);
     try {
       const supabase = getSupabaseBrowserClient();
       const table = scope === "group" ? "itinerary_items" : "personal_items";
       const column = scope === "group" ? "sort_order" : "sort_order";
-      for (const id of orderedIds) {
+      const updates = orderedIds.map(async (id) => {
         const sort_order = orderById.get(id);
-        if (sort_order === undefined) continue;
+        if (sort_order === undefined) return;
         const { error } = await supabase.from(table).update({ [column]: sort_order }).eq("id", id);
         if (error) throw error;
-      }
+      });
+      await Promise.all(updates);
       pushToast({ message: t("today.dnd.reordered"), type: "success" });
       if (scope === "personal") void queryClient.invalidateQueries({ queryKey: personalKey });
       else {

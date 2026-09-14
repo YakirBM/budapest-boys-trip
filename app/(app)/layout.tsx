@@ -2,6 +2,7 @@ import { OfflineBanner } from "@/components/ui/OfflineBanner";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { ShellOverlays } from "@/components/layout/ShellOverlays";
 import { QueryProvider } from "@/lib/queries/realtime";
 import { TRIP_ID } from "@/lib/data/trip";
 
@@ -15,12 +16,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider tripId={TRIP_ID}>
       <ToastProvider>
-        <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-background pt-safe">
+        <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col overflow-x-clip bg-background pt-safe">
           <OfflineBanner />
           <AppHeader />
-          <main id="main" className="flex-1 px-4 pb-nav-safe">
+          <main id="main" className="min-h-0 flex-1 px-4 pb-nav-safe">
             {children}
           </main>
+          <ShellOverlays />
           <BottomNav />
         </div>
       </ToastProvider>

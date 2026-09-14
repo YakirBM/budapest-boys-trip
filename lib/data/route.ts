@@ -32,6 +32,7 @@ export type PlaceStatus =
 export interface LibraryPlace {
   id: string;
   name: string;
+  type: PlaceType;
   category: Category;
   status: PlaceStatus;
   district: string | null;
@@ -46,6 +47,10 @@ export interface LibraryPlace {
   lat: number | null;
   lng: number | null;
   googleMapsUrl: string | null;
+  address: string | null;
+  phone: string | null;
+  imageUrl: string | null;
+  openingHoursNote: string | null;
 }
 
 export interface DayCost {
@@ -103,7 +108,7 @@ export interface MapData {
 
 /* ------------------------------------------------------------------ */
 
-type RawPlaceType =
+export type PlaceType =
   | "restaurant"
   | "bar"
   | "cafe"
@@ -118,7 +123,7 @@ type RawPlaceType =
   | "meeting_point"
   | "other";
 
-export function placeTypeToCategory(type: RawPlaceType): Category {
+export function placeTypeToCategory(type: PlaceType): Category {
   switch (type) {
     case "restaurant":
     case "bar":
@@ -142,6 +147,12 @@ function toNumber(value: number | string | null | undefined): number | null {
   if (value === null || value === undefined) return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function openingHoursNote(value: unknown): string | null {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const note = (value as Record<string, unknown>)["note"];
+  return typeof note === "string" && note.trim() ? note.trim() : null;
 }
 
 const ITEM_SELECT = `id, day_plan_id, title, category, start_time, end_time, duration_min,
@@ -180,8 +191,9 @@ export async function fetchRouteData(
     supabase
       .from("places")
       .select(
-        `id, name, type, status, district, est_price, price_currency, note, source,
-         last_verified_at, tags, needs_reservation, suggested_by, lat, lng, google_maps_url`,
+        `id, name, type, status, district, address_text, phone, image_url, opening_hours,
+         est_price, price_currency, note, source, last_verified_at, tags,
+         needs_reservation, suggested_by, lat, lng, google_maps_url`,
       )
       .eq("trip_id", TRIP_ID)
       .order("created_at", { ascending: false }),
@@ -261,7 +273,7 @@ export async function fetchRouteData(
   const placesRaw = (placesRes.data ?? []) as {
     id: string;
     name: string;
-    type: RawPlaceType;
+    type: PlaceType;
     status: PlaceStatus;
     district: string | null;
     est_price: number | string | null;
@@ -275,11 +287,16 @@ export async function fetchRouteData(
     lat: number | string | null;
     lng: number | string | null;
     google_maps_url: string | null;
+    address_text: string | null;
+    phone: string | null;
+    image_url: string | null;
+    opening_hours: unknown;
   }[];
 
   const places: LibraryPlace[] = placesRaw.map((p) => ({
     id: p.id,
     name: p.name,
+    type: p.type,
     category: placeTypeToCategory(p.type),
     status: p.status,
     district: p.district,
@@ -294,6 +311,10 @@ export async function fetchRouteData(
     lat: toNumber(p.lat),
     lng: toNumber(p.lng),
     googleMapsUrl: p.google_maps_url,
+    address: p.address_text,
+    phone: p.phone,
+    imageUrl: p.image_url,
+    openingHoursNote: openingHoursNote(p.opening_hours),
   }));
 
   return {
@@ -348,7 +369,7 @@ export async function fetchMapData(supabase: SupabaseClient): Promise<MapData> {
   const places: MapPlace[] = ((placesRes.data ?? []) as {
     id: string;
     name: string;
-    type: RawPlaceType;
+    type: PlaceType;
     status: PlaceStatus;
     district: string | null;
     est_price: number | string | null;

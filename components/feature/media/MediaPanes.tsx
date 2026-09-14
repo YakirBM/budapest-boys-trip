@@ -55,7 +55,7 @@ function TileGrid({
   return (
     <div className="columns-2 gap-2 min-[430px]:columns-3">
       {items.map((item) => (
-        <div key={item.id} className="break-inside-avoid">
+        <div key={item.id} className="break-inside-avoid [content-visibility:auto] [contain-intrinsic-size:auto_14rem]">
           {renderTile(item)}
         </div>
       ))}

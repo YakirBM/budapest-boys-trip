@@ -44,6 +44,14 @@ export class TripDB extends Dexie {
       outbox: "id, created_at, failed",
       today_plan: "id, day_number",
     });
+    // v2 adds the index used by expense split reconciliation. Declaring a new
+    // version upgrades the existing object store in place and preserves queued
+    // offline operations already stored on the device.
+    this.version(2).stores({
+      snapshots: "key, synced_at",
+      outbox: "id, table, created_at, failed",
+      today_plan: "id, day_number",
+    });
   }
 }
 

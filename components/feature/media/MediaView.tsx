@@ -350,6 +350,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
   const [upLat, setUpLat] = useState<number | null>(null);
   const [upLng, setUpLng] = useState<number | null>(null);
   const [uploads, setUploads] = useState<UploadTile[]>([]);
+  const [uploadSheetOpen, setUploadSheetOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // View + filters persist in URL params (?view=, ?day=, …) for deep-linking.
@@ -639,6 +640,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
     const list = Array.from(input.files ?? []);
     input.value = ""; // allow re-picking the same file
     if (list.length === 0) return;
+    setUploadSheetOpen(false);
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       pushToast({ message: t("media.requiresConnection"), type: "danger" });
       return;
@@ -800,7 +802,7 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         />
         <button
           type="button"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => setUploadSheetOpen(true)}
           aria-label={t("media.uploadAria")}
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-base font-semibold text-brand-contrast transition-opacity active:opacity-80"
         >
@@ -810,6 +812,14 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
         <p className="text-xs text-text-muted">
           {t("media.photosOnlyHint")} · {t("media.exifNote")}
         </p>
+      </div>
+
+      <BottomSheet
+        open={uploadSheetOpen}
+        onClose={() => setUploadSheetOpen(false)}
+        title={t("media.uploadDetails")}
+      >
+        <div className="flex flex-col gap-3 pb-2">
         <div className="rounded-xl border border-border bg-surface p-3">
           <p className="text-sm font-bold text-text-primary">{t("media.uploadDetails")}</p>
           <p className="mt-0.5 text-xs text-text-muted">{t("media.uploadDetailsHint")}</p>
@@ -923,7 +933,15 @@ export function MediaView({ tripId, initial, members, userId, defaultDay, isPreT
             <p className="text-xs text-text-muted">{t("media.locationNote")}</p>
           </div>
         </div>
-      </div>
+          <Button
+            block
+            icon={<Camera aria-hidden size={19} />}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {t("media.uploadButton")}
+          </Button>
+        </div>
+      </BottomSheet>
 
       {/* Upload tiles (indeterminate progress per file — simplification) */}
       {uploads.length > 0 && (

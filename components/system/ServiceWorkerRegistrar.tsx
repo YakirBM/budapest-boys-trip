@@ -10,8 +10,16 @@ import { useEffect } from "react";
 
 export function ServiceWorkerRegistrar() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
+    if (process.env.NODE_ENV !== "production") {
+      // A worker registered by a previous production preview can otherwise
+      // keep serving stale shell assets from localhost while `next dev` runs.
+      void navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .catch(() => undefined);
+      return;
+    }
     const register = () => {
       navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
         console.warn("[sw] registration failed", error);
